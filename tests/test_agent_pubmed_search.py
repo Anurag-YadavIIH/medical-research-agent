@@ -46,8 +46,11 @@ class _FakeCache:
 
 
 @pytest.fixture(autouse=True)
-def _reset_fake_cache_store() -> None:
+def _reset_fakes() -> None:
     _FakeCache.store = {}
+    _FakePubMedService.call_count = 0
+    _FakePubMedService.closed = False
+    _FakePubMedService.received_query = None
 
 
 def _patch(monkeypatch, service: type = _FakePubMedService, cache: type = _FakeCache) -> None:
@@ -131,3 +134,39 @@ async def test_cache_key_is_stable_for_same_question_and_filters() -> None:
     filters = SearchFilters(year_min=2020)
     assert _cache_key("Q", filters) == _cache_key("Q", filters)
     assert _cache_key("Q", filters) != _cache_key("Different question", filters)
+
+
+async def test_different_questions_with_same_resolved_query_share_cache_entry(
+    monkeypatch,
+) -> None:
+    _patch(monkeypatch)
+    agent = PubMedSearchAgent()
+    filters = SearchFilters()
+    resolved_query = QueryUnderstanding(search_query="keratoconus AND crosslinking")
+
+    await agent.run(
+        ResearchState(
+            question="What treats keratoconus?",
+            filters=filters,
+            query_understanding=resolved_query,
+        )
+    )
+    assert _FakePubMedService.call_count == 1
+
+    # A differently-worded question that the LLM reformulates to the exact same
+    # search_query must reuse the cache entry rather than hitting PubMed again.
+    delta = await agent.run(
+        ResearchState(
+            question="How is keratoconus managed nowadays?",
+            filters=filters,
+            query_understanding=resolved_query,
+        )
+    )
+
+    assert _FakePubMedService.call_count == 1
+    assert delta["studies"] == [Study(pmid="90000001", title="Synthetic fixture study")]
+
+
+def test_cache_key_changes_when_filters_change_for_the_same_query() -> None:
+    query = "keratoconus AND crosslinking"
+    assert _cache_key(query, SearchFilters()) != _cache_key(query, SearchFilters(year_min=2020))

@@ -12,8 +12,10 @@ from medical_research_agent.services.cache import Cache
 from medical_research_agent.services.pubmed import PubMedService
 
 
-def _cache_key(question: str, filters: SearchFilters) -> str:
-    digest = hashlib.sha256(f"{question}|{filters.model_dump_json()}".encode()).hexdigest()
+def _cache_key(query: str, filters: SearchFilters) -> str:
+    # Keyed on the resolved query, not the raw question, so a different
+    # reformulation never reuses results fetched for a different search.
+    digest = hashlib.sha256(f"{query}|{filters.model_dump_json()}".encode()).hexdigest()
     return f"pubmed_search:{digest}"
 
 
@@ -30,7 +32,7 @@ class PubMedSearchAgent(BaseAgent):
         )
 
         cache = Cache(settings=self.settings)
-        cache_key = _cache_key(state.question, state.filters)
+        cache_key = _cache_key(query, state.filters)
         cached = await cache.get(cache_key)
         if cached is not None:
             await cache.aclose()
