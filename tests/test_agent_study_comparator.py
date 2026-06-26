@@ -44,7 +44,7 @@ async def test_no_studies_returns_empty_comparison_without_llm_call(fake_chat_mo
     assert delta["comparison"] == StudyComparison()
 
 
-async def test_llm_failure_returns_empty_comparison_and_error(fake_chat_model) -> None:
+async def test_llm_failure_still_returns_deterministic_matrix_and_error(fake_chat_model) -> None:
     fake_chat_model("medical_research_agent.agents.study_comparator", RuntimeError("boom"))
 
     agent = StudyComparatorAgent()
@@ -52,5 +52,46 @@ async def test_llm_failure_returns_empty_comparison_and_error(fake_chat_model) -
 
     delta = await agent.run(state)
 
-    assert delta["comparison"] == StudyComparison()
+    comparison = delta["comparison"]
+    assert comparison.agreements == []
+    assert comparison.comparison_matrix == [
+        {
+            "pmid": "90000001",
+            "title": "A",
+            "evidence_level": "Ungraded",
+            "strength": "",
+            "main_finding": "",
+        }
+    ]
     assert any("boom" in e for e in delta["errors"])
+
+
+async def test_comparison_matrix_is_built_deterministically_from_state(fake_chat_model) -> None:
+    from medical_research_agent.models.evidence import EvidenceAssessment, EvidenceLevel
+    from medical_research_agent.models.study import ExtractedStudy
+
+    fake_chat_model("medical_research_agent.agents.study_comparator", StudyComparison())
+
+    agent = StudyComparatorAgent()
+    state = ResearchState(
+        question="Q",
+        studies=[Study(pmid="90000001", title="A")],
+        extracted=[ExtractedStudy(pmid="90000001", main_findings="Symptom improvement observed.")],
+        assessments=[
+            EvidenceAssessment(
+                pmid="90000001", evidence_level=EvidenceLevel.LEVEL_II, strength="strong"
+            )
+        ],
+    )
+
+    delta = await agent.run(state)
+
+    assert delta["comparison"].comparison_matrix == [
+        {
+            "pmid": "90000001",
+            "title": "A",
+            "evidence_level": "Level II — Randomized controlled trial",
+            "strength": "strong",
+            "main_finding": "Symptom improvement observed.",
+        }
+    ]

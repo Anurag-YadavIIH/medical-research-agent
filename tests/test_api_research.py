@@ -11,11 +11,15 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from medical_research_agent.api.schemas import DISCLAIMER
 from medical_research_agent.config import Settings
+from medical_research_agent.database.repository import ResearchRepository
+from medical_research_agent.models.comparison import StudyComparison
+from medical_research_agent.models.evidence import EvidenceAssessment, EvidenceLevel
 from medical_research_agent.models.report import EvidenceReport, ReferenceEntry
-from medical_research_agent.models.study import Study
+from medical_research_agent.models.study import ExtractedStudy, Study
 
 _STUDY = Study(
     pmid="90000001",
@@ -29,6 +33,27 @@ _REPORT = EvidenceReport(
     markdown="# What treats keratoconus?\n\nSynthetic report content.",
     evidence_summary="Synthetic evidence summary [PMID: 90000001].",
     studies=[_STUDY],
+    extracted=[
+        ExtractedStudy(pmid="90000001", main_findings="Synthetic symptom improvement observed.")
+    ],
+    assessments=[
+        EvidenceAssessment(
+            pmid="90000001", evidence_level=EvidenceLevel.LEVEL_II, strength="moderate"
+        )
+    ],
+    comparison=StudyComparison(
+        agreements=["Synthetic agreement."],
+        strongest_evidence_pmids=["90000001"],
+        comparison_matrix=[
+            {
+                "pmid": "90000001",
+                "title": "Synthetic Study of Keratoconus Treatment",
+                "evidence_level": "Level II — Randomized controlled trial",
+                "strength": "moderate",
+                "main_finding": "Synthetic symptom improvement observed.",
+            }
+        ],
+    ),
     references=[
         ReferenceEntry(
             pmid="90000001",
@@ -148,3 +173,48 @@ def test_get_studies_404_for_unknown_query_id(client: TestClient) -> None:
     response = client.get("/studies/does-not-exist")
 
     assert response.status_code == 404
+
+
+async def test_extracted_and_comparison_survive_the_persistence_round_trip(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, db_session: AsyncSession
+) -> None:
+    _patch_llm_configured(monkeypatch)
+    _patch_graph(monkeypatch, {"errors": [], "studies": [_STUDY], "report": _REPORT})
+
+    response = client.post("/research", json={"question": "What treats keratoconus?"})
+    assert response.status_code == 200
+    body = response.json()
+
+    # The exact same dict returned to the client...
+    assert body["machine_json"]["extracted"] == [
+        {
+            "pmid": "90000001",
+            "objective": "",
+            "sample_size": None,
+            "study_design": "",
+            "population": "",
+            "intervention": "",
+            "comparator": "",
+            "outcomes": [],
+            "main_findings": "Synthetic symptom improvement observed.",
+            "statistical_significance": "",
+            "limitations": "",
+        }
+    ]
+    assert body["machine_json"]["comparison"]["agreements"] == ["Synthetic agreement."]
+    assert body["machine_json"]["comparison"]["strongest_evidence_pmids"] == ["90000001"]
+    assert body["machine_json"]["comparison"]["comparison_matrix"] == [
+        {
+            "pmid": "90000001",
+            "title": "Synthetic Study of Keratoconus Treatment",
+            "evidence_level": "Level II — Randomized controlled trial",
+            "strength": "moderate",
+            "main_finding": "Synthetic symptom improvement observed.",
+        }
+    ]
+
+    # ...must be exactly what's stored, queried back via the repository directly.
+    repo = ResearchRepository(db_session)
+    summary_record = await repo.get_summary(body["query_id"])
+    assert summary_record is not None
+    assert summary_record.machine_json == body["machine_json"]

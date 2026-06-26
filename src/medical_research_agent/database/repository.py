@@ -58,3 +58,9 @@ class ResearchRepository:
             select(StudyRecord).where(StudyRecord.query_id == query_id)
         )
         return list(result.scalars().all())
+
+    async def get_summary(self, query_id: str) -> SummaryRecord | None:
+        result = await self.session.execute(
+            select(SummaryRecord).where(SummaryRecord.query_id == query_id)
+        )
+        return result.scalar_one_or_none()

@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from medical_research_agent.agents.base import BaseAgent
 from medical_research_agent.llm.factory import get_chat_model
+from medical_research_agent.models.comparison import StudyComparison
 from medical_research_agent.models.report import EvidenceReport, ReferenceEntry
 from medical_research_agent.models.state import ResearchState
 from medical_research_agent.models.study import Study
@@ -51,6 +52,27 @@ def _vancouver_reference(study: Study) -> ReferenceEntry:
     journal = f" {study.journal}." if study.journal else ""
     vancouver = f"{authors}. {title}.{journal} {year}. PMID: {study.pmid}."
     return ReferenceEntry(pmid=study.pmid, doi=study.doi, vancouver=vancouver, url=study.url)
+
+
+def _sanitized_comparison(
+    comparison: StudyComparison | None, valid_pmids: set[str]
+) -> StudyComparison | None:
+    """Re-filter PMIDs against state.studies — defense in depth on top of the
+    filtering study_comparator already does, since this is what gets serialized
+    and persisted as part of the report.
+    """
+    if comparison is None:
+        return None
+    return comparison.model_copy(
+        update={
+            "strongest_evidence_pmids": [
+                pmid for pmid in comparison.strongest_evidence_pmids if pmid in valid_pmids
+            ],
+            "conflicting_evidence_pmids": [
+                pmid for pmid in comparison.conflicting_evidence_pmids if pmid in valid_pmids
+            ],
+        }
+    )
 
 
 def _strip_fabricated_citations(text: str, valid_pmids: set[str]) -> tuple[str, list[str]]:
@@ -103,6 +125,9 @@ class SummaryAgent(BaseAgent):
         report = EvidenceReport(
             question=state.question,
             studies=state.studies,
+            extracted=state.extracted,
+            assessments=state.assessments,
+            comparison=_sanitized_comparison(state.comparison, valid_pmids),
             references=references,
             evidence_summary=sections.evidence_summary,
             clinical_implications=sections.clinical_implications,
