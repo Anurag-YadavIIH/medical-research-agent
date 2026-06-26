@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from medical_research_agent.agents.base import BaseAgent
 from medical_research_agent.models.state import ResearchState
+from medical_research_agent.services.pubmed import PubMedService
 
 
 class PubMedSearchAgent(BaseAgent):
@@ -12,7 +13,14 @@ class PubMedSearchAgent(BaseAgent):
     name = "pubmed_search"
 
     async def run(self, state: ResearchState) -> dict[str, object]:
-        # TODO (Phase 2/3): implement. Stub passes state through unchanged so the
-        # graph is wired and executable end-to-end during scaffolding.
-        self.log.warning("agent.stub", step=self.name)
-        return {}
+        query = (
+            state.query_understanding.search_query
+            if state.query_understanding and state.query_understanding.search_query
+            else state.question
+        )
+        service = PubMedService(settings=self.settings)
+        try:
+            studies = await service.search(query, state.filters)
+        finally:
+            await service.aclose()
+        return {"studies": studies}

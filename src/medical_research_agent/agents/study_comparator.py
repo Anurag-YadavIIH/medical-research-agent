@@ -2,8 +2,21 @@
 
 from __future__ import annotations
 
+from typing import cast
+
+from langchain_core.messages import HumanMessage, SystemMessage
+
 from medical_research_agent.agents.base import BaseAgent
+from medical_research_agent.llm.factory import get_chat_model
+from medical_research_agent.models.comparison import StudyComparison
 from medical_research_agent.models.state import ResearchState
+
+_SYSTEM_PROMPT = (
+    "You are comparing biomedical studies that have already been retrieved and "
+    "appraised. Identify points of agreement, disagreement, and emerging trends "
+    "across them. You may only reference the PMIDs given to you below — never "
+    "invent a PMID that is not in the provided list."
+)
 
 
 class StudyComparatorAgent(BaseAgent):
@@ -12,7 +25,49 @@ class StudyComparatorAgent(BaseAgent):
     name = "study_comparator"
 
     async def run(self, state: ResearchState) -> dict[str, object]:
-        # TODO (Phase 2/3): implement. Stub passes state through unchanged so the
-        # graph is wired and executable end-to-end during scaffolding.
-        self.log.warning("agent.stub", step=self.name)
-        return {}
+        if not state.studies:
+            return {"comparison": StudyComparison()}
+
+        context = self._build_context(state)
+        model = get_chat_model().with_structured_output(StudyComparison)
+        try:
+            comparison = cast(
+                StudyComparison,
+                await model.ainvoke(
+                    [SystemMessage(content=_SYSTEM_PROMPT), HumanMessage(content=context)]
+                ),
+            )
+        except Exception as exc:  # noqa: BLE001 - failure shouldn't crash the graph
+            return {
+                "comparison": StudyComparison(),
+                "errors": [f"{self.name}: comparison failed: {exc}"],
+            }
+
+        valid_pmids = {study.pmid for study in state.studies}
+        comparison.strongest_evidence_pmids = [
+            pmid for pmid in comparison.strongest_evidence_pmids if pmid in valid_pmids
+        ]
+        comparison.conflicting_evidence_pmids = [
+            pmid for pmid in comparison.conflicting_evidence_pmids if pmid in valid_pmids
+        ]
+        return {"comparison": comparison}
+
+    def _build_context(self, state: ResearchState) -> str:
+        extracted_by_pmid = {item.pmid: item for item in state.extracted}
+        assessment_by_pmid = {item.pmid: item for item in state.assessments}
+
+        lines = ["Studies (cite only these PMIDs):"]
+        for study in state.studies:
+            extracted = extracted_by_pmid.get(study.pmid)
+            assessment = assessment_by_pmid.get(study.pmid)
+            lines.append(f"- PMID {study.pmid}: {study.title}")
+            if assessment:
+                lines.append(
+                    f"  Evidence level: {assessment.evidence_level.label}; "
+                    f"strength: {assessment.strength or 'unknown'}"
+                )
+            if extracted and extracted.main_findings:
+                lines.append(f"  Main findings: {extracted.main_findings}")
+            elif study.abstract:
+                lines.append(f"  Abstract: {study.abstract}")
+        return "\n".join(lines)
