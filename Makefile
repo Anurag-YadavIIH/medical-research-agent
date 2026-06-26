@@ -1,4 +1,4 @@
-.PHONY: install dev frontend test lint format type up down logs migrate
+.PHONY: install dev frontend test lint format type up down logs migrate eval
 
 install:        ## Install runtime + dev + frontend deps with uv (fallback: pip)
 	uv sync --extra dev --extra frontend || pip install -e ".[dev,frontend]"
@@ -13,13 +13,13 @@ test:           ## Run tests with coverage
 	pytest
 
 lint:           ## Lint with ruff
-	ruff check src tests
+	ruff check src tests evaluations
 
 format:         ## Format with black + ruff
-	black src tests && ruff check --fix src tests
+	black src tests evaluations && ruff check --fix src tests evaluations
 
 type:           ## Static type-check
-	mypy src
+	mypy src evaluations
 
 up:             ## Start the full stack
 	docker compose up --build
@@ -32,3 +32,6 @@ logs:           ## Tail backend logs
 
 migrate:        ## Apply DB migrations
 	alembic upgrade head
+
+eval:           ## Run the evaluation harness against fixtures (add ARGS="--live" for a real run)
+	python -m evaluations.cli $(ARGS)

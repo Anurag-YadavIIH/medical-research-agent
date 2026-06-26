@@ -1,6 +1,80 @@
 {
-  "question": "What are recent treatments for keratoconus?",
-  "expected_interventions": ["corneal cross-linking", "intracorneal ring segments", "keratoplasty"],
-  "min_studies": 5,
-  "must_cite_pmids": []
+  "case_id": "keratoconus_crosslinking",
+  "question": "What randomized controlled trials exist for corneal cross-linking in progressive keratoconus?",
+  "filters": { "max_papers": 5, "humans_only": true },
+  "min_studies": 3,
+  "retrieved_pmids": ["41758421", "40630024", "40340672"],
+
+  "gold_extractions": {
+    "41758421": {
+      "study_design": "Randomized Controlled Trial",
+      "population": "Fifty eyes of fifty patients aged 12-35 years with documented progressive keratoconus",
+      "intervention": "Accelerated transepithelial (epi-on) corneal collagen cross-linking with Vitamin E TPGS-enhanced riboflavin",
+      "comparator": "Accelerated epithelium-off (epi-off) corneal collagen cross-linking",
+      "sample_size": 50,
+      "main_findings": "Both groups showed significant visual and tomographic improvement at 12 months; epi-on CXL demonstrated stabilization comparable to epi-off CXL with better pachymetric preservation.",
+      "statistical_significance": "p < 0.001 for intragroup keratometric flattening; p < 0.05 for intergroup corneal thickness difference"
+    },
+    "40630024": {
+      "study_design": "Randomized Controlled Trial",
+      "population": "54 eyes with progressive keratoconus, including thin corneae under 400 micrometres",
+      "intervention": "Epithelium-off corneal cross-linking with isoosmolar dextran-based riboflavin",
+      "comparator": "Epithelium-off corneal cross-linking with hypoosmolar dextran-free riboflavin",
+      "sample_size": 54,
+      "main_findings": "No statistically significant differences between isoosmolar and hypoosmolar groups; the hypoosmolar group required sterile water addition far less often (15% vs 74%).",
+      "statistical_significance": "Not statistically significant between riboflavin groups"
+    },
+    "40340672": {
+      "study_design": "Randomized Controlled Trial",
+      "population": "140 eyes of 77 patients with paracentral progressive keratoconus",
+      "intervention": "Accelerated epithelium-off cross-linking preserving a central 3mm epithelial island",
+      "comparator": "Accelerated epithelium-off cross-linking with full epithelium removal over a 9mm central disk",
+      "sample_size": 140,
+      "main_findings": "The epithelial-island-preservation group had better early corrected visual acuity, less corneal haze, and less pain; both groups improved significantly at 12 months.",
+      "statistical_significance": "Significant difference between groups in early CDVA, haze, and pain (exact p-value not given in the abstract)"
+    }
+  },
+
+  "stub_query_understanding": {
+    "disease": "keratoconus",
+    "intervention": "corneal collagen cross-linking",
+    "search_query": "keratoconus AND corneal collagen crosslinking AND randomized controlled trial"
+  },
+
+  "stub_extractions": {
+    "41758421": {
+      "study_design": "Randomized Controlled Trial",
+      "population": "Fifty eyes of fifty patients aged 12-35 years with documented progressive keratoconus",
+      "intervention": "Accelerated transepithelial (epi-on) corneal collagen cross-linking with Vitamin E TPGS-enhanced riboflavin",
+      "comparator": "Accelerated epithelium-off (epi-off) corneal collagen cross-linking",
+      "sample_size": 50,
+      "main_findings": "Both groups showed significant visual and tomographic improvement at 12 months; epi-on CXL demonstrated stabilization comparable to epi-off CXL with better pachymetric preservation.",
+      "statistical_significance": "p < 0.001 for intragroup keratometric flattening; p < 0.05 for intergroup corneal thickness difference"
+    },
+    "40630024": {
+      "study_design": "Randomized Controlled Trial",
+      "population": "54 eyes with progressive keratoconus, including thin corneae under 400 micrometres",
+      "intervention": "Epithelium-off corneal cross-linking with isoosmolar dextran-based riboflavin",
+      "comparator": "Epithelium-off corneal cross-linking with hypoosmolar dextran-free riboflavin",
+      "sample_size": 54,
+      "main_findings": "No statistically significant differences between isoosmolar and hypoosmolar groups; the hypoosmolar group required sterile water addition far less often (15% vs 74%).",
+      "statistical_significance": "Not statistically significant between riboflavin groups"
+    },
+    "40340672": {
+      "study_design": "Randomized Controlled Trial",
+      "population": "140 eyes of 77 patients with paracentral progressive keratoconus",
+      "intervention": "Accelerated epithelium-off cross-linking preserving a central 3mm epithelial island",
+      "comparator": "",
+      "sample_size": 140,
+      "main_findings": "The epithelial-island-preservation group had better early corrected visual acuity, less corneal haze, and less pain; both groups improved significantly at 12 months.",
+      "statistical_significance": "Significant difference between groups in early CDVA, haze, and pain (exact p-value not given in the abstract)"
+    }
+  },
+
+  "stub_narrative": {
+    "evidence_summary": "Across three randomized controlled trials of corneal cross-linking for progressive keratoconus, accelerated epi-on and epi-off protocols produced comparable 12-month visual and tomographic stabilization [PMID: 41758421]. Riboflavin osmolarity did not significantly affect outcomes, though hypoosmolar formulations reduced the need for sterile water in thin corneas [PMID: 40630024]. Preserving a central epithelial island during cross-linking improved early comfort and reduced haze without compromising 12-month efficacy in a cohort of 120 patients [PMID: 40340672].",
+    "clinical_implications": "Both epi-on and epi-off cross-linking protocols appear viable for halting keratoconus progression; epithelial-sparing techniques may improve early postoperative comfort.",
+    "limitations": "All three trials report 12-month outcomes only; longer-term progression and retreatment rates are not addressed.",
+    "future_directions": "Longer follow-up and head-to-head trials of epithelial-sparing versus standard epi-off protocols are warranted."
+  }
 }
