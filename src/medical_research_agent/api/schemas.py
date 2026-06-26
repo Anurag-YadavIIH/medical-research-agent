@@ -28,6 +28,7 @@ class ResearchResponse(BaseModel):
     question: str
     report_markdown: str
     machine_json: dict[str, Any]
+    warnings: list[str] = Field(default_factory=list)
     disclaimer: str = DISCLAIMER
 
 

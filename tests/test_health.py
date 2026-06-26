@@ -22,11 +22,6 @@ def test_openapi_exposes_required_endpoints(client) -> None:
     assert "/health" in paths
 
 
-def test_research_stub_not_implemented(client) -> None:
-    resp = client.post("/research", json={"question": "What treats keratoconus?"})
-    assert resp.status_code == 501
-
-
 def test_disclaimer_in_openapi(client) -> None:
     spec = client.get("/openapi.json").json()
     assert "research and educational purposes only" in spec["info"]["description"].lower()

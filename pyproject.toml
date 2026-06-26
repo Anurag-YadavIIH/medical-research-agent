@@ -41,6 +41,7 @@ dev = [
     "pytest-asyncio>=0.23",
     "pytest-cov>=5.0",
     "respx>=0.21",             # httpx mocking
+    "aiosqlite>=0.20",         # async sqlite driver for DB integration tests
     "ruff>=0.6",
     "black>=24.4",
     "mypy>=1.10",

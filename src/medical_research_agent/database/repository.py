@@ -16,25 +16,42 @@ class ResearchRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def create_query(self, question: str, filters: SearchFilters) -> QueryRecord:
-        record = QueryRecord(question=question, filters=filters.model_dump())
-        self.session.add(record)
-        await self.session.flush()
-        return record
+    async def save_research_run(
+        self, question: str, filters: SearchFilters, report: EvidenceReport
+    ) -> QueryRecord:
+        """Persist the query, its studies and the generated summary in one transaction.
 
-    async def save_report(self, query_id: str, report: EvidenceReport) -> None:
-        for study in report.studies:
+        Rolls back the whole run if any part fails, so a partially-written query
+        never ends up in the database.
+        """
+        try:
+            query = QueryRecord(question=question, filters=filters.model_dump(mode="json"))
+            self.session.add(query)
+            await self.session.flush()  # assigns query.id for the foreign keys below
+
+            for study in report.studies:
+                self.session.add(
+                    StudyRecord(
+                        query_id=query.id,
+                        pmid=study.pmid,
+                        payload=study.model_dump(mode="json"),
+                    )
+                )
             self.session.add(
-                StudyRecord(query_id=query_id, pmid=study.pmid, payload=study.model_dump())
+                SummaryRecord(
+                    query_id=query.id,
+                    markdown=report.markdown,
+                    machine_json=report.to_machine_json(),
+                )
             )
-        self.session.add(
-            SummaryRecord(
-                query_id=query_id,
-                markdown=report.markdown,
-                machine_json=report.to_machine_json(),
-            )
-        )
-        await self.session.commit()
+            await self.session.commit()
+        except Exception:
+            await self.session.rollback()
+            raise
+        return query
+
+    async def get_query(self, query_id: str) -> QueryRecord | None:
+        return await self.session.get(QueryRecord, query_id)
 
     async def get_studies(self, query_id: str) -> list[StudyRecord]:
         result = await self.session.execute(

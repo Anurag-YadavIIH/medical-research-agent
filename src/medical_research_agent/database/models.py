@@ -6,9 +6,13 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import ForeignKey, String, Text, func
+from sqlalchemy import JSON, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+# Postgres in production, plain JSON under SQLite (used by the test suite — see
+# tests/conftest.py for why: SQLite has no JSONB type).
+_JSONType = JSONB().with_variant(JSON(), "sqlite")
 
 
 class Base(DeclarativeBase):
@@ -26,7 +30,7 @@ class QueryRecord(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     question: Mapped[str] = mapped_column(Text)
-    filters: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    filters: Mapped[dict[str, Any]] = mapped_column(_JSONType, default=dict)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     studies: Mapped[list[StudyRecord]] = relationship(
@@ -45,7 +49,7 @@ class StudyRecord(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     query_id: Mapped[str] = mapped_column(ForeignKey("queries.id", ondelete="CASCADE"))
     pmid: Mapped[str] = mapped_column(String(32), index=True)
-    payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    payload: Mapped[dict[str, Any]] = mapped_column(_JSONType)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     query: Mapped[QueryRecord] = relationship(back_populates="studies")
@@ -59,7 +63,7 @@ class SummaryRecord(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     query_id: Mapped[str] = mapped_column(ForeignKey("queries.id", ondelete="CASCADE"))
     markdown: Mapped[str] = mapped_column(Text, default="")
-    machine_json: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    machine_json: Mapped[dict[str, Any]] = mapped_column(_JSONType, default=dict)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     query: Mapped[QueryRecord] = relationship(back_populates="summary")
