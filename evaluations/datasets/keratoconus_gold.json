@@ -1,0 +1,6 @@
+{
+  "question": "What are recent treatments for keratoconus?",
+  "expected_interventions": ["corneal cross-linking", "intracorneal ring segments", "keratoplasty"],
+  "min_studies": 5,
+  "must_cite_pmids": []
+}
