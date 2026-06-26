@@ -41,13 +41,16 @@ class _LLMJudgment(BaseModel):
     confidence_reasoning: str = ""
 
 
+def _matched_levels(publication_types: list[str]) -> list[EvidenceLevel]:
+    """Return every level-of-evidence category present, strongest first."""
+    lowered = " | ".join(pt.lower() for pt in publication_types)
+    return [level for level, keywords in _LEVEL_KEYWORDS if any(kw in lowered for kw in keywords)]
+
+
 def deterministic_level(publication_types: list[str]) -> EvidenceLevel:
     """Map PubMed publication types to a level-of-evidence grade deterministically."""
-    lowered = " | ".join(pt.lower() for pt in publication_types)
-    for level, keywords in _LEVEL_KEYWORDS:
-        if any(keyword in lowered for keyword in keywords):
-            return level
-    return EvidenceLevel.UNGRADED
+    matched = _matched_levels(publication_types)
+    return matched[0] if matched else EvidenceLevel.UNGRADED
 
 
 class EvidenceEvaluatorAgent(BaseAgent):
@@ -61,15 +64,24 @@ class EvidenceEvaluatorAgent(BaseAgent):
         errors: list[str] = []
 
         for study in state.studies:
-            level = deterministic_level(study.publication_types)
+            matched_levels = _matched_levels(study.publication_types)
+            level = matched_levels[0] if matched_levels else EvidenceLevel.UNGRADED
             judgment = await self._judge(model, study, errors)
+            confidence_reasoning = judgment.confidence_reasoning
+            if len(matched_levels) > 1:
+                note = (
+                    f"Publication types span multiple evidence categories "
+                    f"({', '.join(study.publication_types)}); graded at the strongest "
+                    f"applicable level ({level.label})."
+                )
+                confidence_reasoning = f"{note} {confidence_reasoning}".strip()
             assessments.append(
                 EvidenceAssessment(
                     pmid=study.pmid,
                     evidence_level=level,
                     strength=judgment.strength,
                     bias_risk=judgment.bias_risk,
-                    confidence_reasoning=judgment.confidence_reasoning,
+                    confidence_reasoning=confidence_reasoning,
                 )
             )
 

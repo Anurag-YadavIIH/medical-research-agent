@@ -36,6 +36,96 @@ def test_deterministic_level_mapping(publication_types: list[str], expected: Evi
     assert deterministic_level(publication_types) == expected
 
 
+@pytest.mark.parametrize(
+    "publication_types",
+    [
+        ["Meta-Analysis", "Randomized Controlled Trial"],
+        ["Cohort Studies", "Case-Control Studies", "Case Reports"],
+    ],
+)
+def test_multiple_matching_categories_resolve_to_strongest_level(
+    publication_types: list[str],
+) -> None:
+    expected = min(deterministic_level([pt]) for pt in publication_types)
+    assert deterministic_level(publication_types) == expected
+
+
+@pytest.mark.parametrize(
+    "publication_types",
+    [[], ["Journal Article"], ["Comment"], ["Letter", "Editorial"]],
+)
+def test_unmapped_publication_types_are_ungraded_not_level_v(
+    publication_types: list[str],
+) -> None:
+    assert deterministic_level(publication_types) == EvidenceLevel.UNGRADED
+
+
+@pytest.mark.parametrize("publication_types", [["Review"], ["Review", "Journal Article"]])
+def test_bare_review_does_not_map_to_level_i(publication_types: list[str]) -> None:
+    assert deterministic_level(publication_types) != EvidenceLevel.LEVEL_I
+    assert deterministic_level(publication_types) == EvidenceLevel.UNGRADED
+
+
+async def test_mixed_publication_types_are_noted_in_confidence_reasoning(
+    fake_chat_model,
+) -> None:
+    class _Judgment:
+        strength = "moderate"
+        bias_risk = "low"
+        confidence_reasoning = "Well-designed per the abstract."
+
+    fake_chat_model("medical_research_agent.agents.evidence_evaluator", _Judgment())
+
+    agent = EvidenceEvaluatorAgent()
+    state = ResearchState(
+        question="Q",
+        studies=[
+            Study(
+                pmid="90000001",
+                title="A",
+                abstract="Some abstract text.",
+                publication_types=["Meta-Analysis", "Randomized Controlled Trial"],
+            )
+        ],
+    )
+
+    delta = await agent.run(state)
+
+    assessment = delta["assessments"][0]
+    assert assessment.evidence_level == EvidenceLevel.LEVEL_I
+    assert "multiple evidence categories" in assessment.confidence_reasoning
+    assert "Well-designed per the abstract." in assessment.confidence_reasoning
+
+
+async def test_single_matching_category_does_not_add_mixed_note(fake_chat_model) -> None:
+    class _Judgment:
+        strength = "moderate"
+        bias_risk = "low"
+        confidence_reasoning = "Well-designed per the abstract."
+
+    fake_chat_model("medical_research_agent.agents.evidence_evaluator", _Judgment())
+
+    agent = EvidenceEvaluatorAgent()
+    state = ResearchState(
+        question="Q",
+        studies=[
+            Study(
+                pmid="90000001",
+                title="A",
+                abstract="Some abstract text.",
+                # "Journal Article" doesn't map to any category, so only one
+                # category actually matches here — not a mixed-typing case.
+                publication_types=["Journal Article", "Meta-Analysis"],
+            )
+        ],
+    )
+
+    delta = await agent.run(state)
+
+    assessment = delta["assessments"][0]
+    assert assessment.confidence_reasoning == "Well-designed per the abstract."
+
+
 async def test_llm_cannot_override_deterministic_level(fake_chat_model) -> None:
     class _SneakyJudgment:
         """Mimics an LLM trying to also set evidence_level — must be ignored."""

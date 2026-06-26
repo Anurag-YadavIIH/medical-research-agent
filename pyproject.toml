@@ -79,6 +79,10 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = ["numpy", "numpy.*", "tiktoken.*"]
 follow_imports = "skip"
+# numpy (reached transitively via tiktoken.core's `TYPE_CHECKING: import numpy`)
+# ships inline .pyi stubs. mypy ignores follow_imports for such packages unless
+# follow_imports_for_stubs is also set, so without this line numpy's stub is
+# still parsed and fails on its PEP 695 syntax under python_version = "3.11".
 follow_imports_for_stubs = true
 
 [tool.pytest.ini_options]
