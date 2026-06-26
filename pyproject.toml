@@ -27,15 +27,21 @@ dependencies = [
     "asyncpg>=0.29",
     "alembic>=1.13",
     "redis>=5.0",
-    # Frontend
-    "streamlit>=1.37",
-    "pandas>=2.2",
     # Observability / utils
     "structlog>=24.1",
     "python-dotenv>=1.0",
 ]
 
 [project.optional-dependencies]
+# Only needed to run frontend/app.py locally from this same venv. Deliberately
+# NOT in the base dependencies: the backend Docker image runs `pip install .`
+# with no extras, and frontend/app.py never imports this package at all (its
+# own container installs streamlit/pandas/requests directly) — so bundling
+# these here would only bloat the backend image for no reason.
+frontend = [
+    "streamlit>=1.37",
+    "pandas>=2.2",
+]
 dev = [
     "pytest>=8.2",
     "pytest-asyncio>=0.23",

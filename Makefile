@@ -1,10 +1,13 @@
-.PHONY: install dev test lint format type up down logs migrate
+.PHONY: install dev frontend test lint format type up down logs migrate
 
-install:        ## Install runtime + dev deps with uv (fallback: pip)
-	uv sync --extra dev || pip install -e ".[dev]"
+install:        ## Install runtime + dev + frontend deps with uv (fallback: pip)
+	uv sync --extra dev --extra frontend || pip install -e ".[dev,frontend]"
 
 dev:            ## Run API with autoreload
 	uvicorn medical_research_agent.api.main:app --reload --app-dir src
+
+frontend:       ## Run the Streamlit UI locally
+	streamlit run frontend/app.py
 
 test:           ## Run tests with coverage
 	pytest

@@ -70,8 +70,9 @@ git clone <repo-url> && cd medical-research-agent
 cp .env.example .env        # fill in OPENAI_API_KEY / GROQ_API_KEY and NCBI_EMAIL
 
 # 3a. Local dev (uv preferred)
-uv sync --extra dev         # or: pip install -e ".[dev]"
-make dev                    # API at http://localhost:8000/docs
+uv sync --extra dev --extra frontend   # or: pip install -e ".[dev,frontend]"
+make dev                               # API at http://localhost:8000/docs
+make frontend                          # Streamlit at http://localhost:8501 (separate shell)
 
 # 3b. Full stack
 docker compose up --build   # API :8000 · Streamlit :8501 · Postgres · Redis
@@ -86,9 +87,49 @@ See [`.env.example`](.env.example). Key ones: `DEFAULT_LLM_PROVIDER`,
 
 ## Docker setup
 
-`docker compose up --build` starts four services — `backend`, `frontend`,
-`postgres`, `redis` — with health checks and a persistent Postgres volume. The
-frontend reaches the API via `BACKEND_URL`.
+```bash
+# 1. Configure (once)
+cp .env.example .env        # fill in OPENAI_API_KEY / GROQ_API_KEY and NCBI_EMAIL
+
+# 2. Bring the stack up
+docker compose up --build
+
+# 3. Tear down (add -v to also drop the Postgres volume)
+docker compose down [-v]
+```
+
+`docker compose up --build` runs five services:
+
+| Service | Role |
+|---|---|
+| `postgres` | Database. Has a healthcheck (`pg_isready`). |
+| `redis` | Cache. Has a healthcheck (`redis-cli ping`). |
+| `migrate` | One-shot: runs `alembic upgrade head` once Postgres is healthy, then exits. Re-running the stack re-runs this — it's a no-op if the schema is already current. |
+| `backend` | FastAPI app. Only starts once `migrate` has exited successfully (`depends_on: migrate: condition: service_completed_successfully`) and `postgres`/`redis` are healthy. Has its own healthcheck against `GET /health`. |
+| `frontend` | Streamlit UI. Only starts once `backend` is healthy. Reaches the API via `BACKEND_URL=http://backend:8000`. |
+
+Tables are created exclusively through this `migrate` step (`alembic upgrade
+head`) — the containerized path never relies on `Base.metadata.create_all`.
+Migrations are not baked into the image at build time; `docker/backend.Dockerfile`
+only copies `alembic.ini` and `alembic/` into the image, and the actual
+`alembic upgrade head` only runs at container start, as the `migrate` service's
+command.
+
+Once up: API at `http://localhost:8000` (`/docs` for Swagger), Streamlit at
+`http://localhost:8501`. `GET /health` reports `"redis": "ok"` once the stack
+is running (it shows `"unavailable"` if you run the API standalone with `make
+dev` and no local Redis). `POST /research` returns a `503` with an actionable
+message if no LLM provider key is set in `.env`.
+
+To generate a new migration after changing the SQLAlchemy models:
+
+```bash
+docker compose up -d postgres   # or point DATABASE_URL at any reachable Postgres
+DATABASE_URL=postgresql+asyncpg://mra:mra@localhost:5432/mra \
+  uv run alembic revision --autogenerate -m "describe the change"
+DATABASE_URL=postgresql+asyncpg://mra:mra@localhost:5432/mra \
+  uv run alembic upgrade head   # verify it applies cleanly
+```
 
 ## API
 

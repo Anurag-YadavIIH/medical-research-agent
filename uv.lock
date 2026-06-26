@@ -1435,13 +1435,11 @@ dependencies = [
     { name = "langchain-openai" },
     { name = "langgraph" },
     { name = "lxml" },
-    { name = "pandas" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "python-dotenv" },
     { name = "redis" },
     { name = "sqlalchemy", extra = ["asyncio"] },
-    { name = "streamlit" },
     { name = "structlog" },
     { name = "tenacity" },
     { name = "uvicorn", extra = ["standard"] },
@@ -1460,6 +1458,10 @@ dev = [
     { name = "ruff" },
     { name = "types-redis" },
 ]
+frontend = [
+    { name = "pandas" },
+    { name = "streamlit" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -1475,7 +1477,7 @@ requires-dist = [
     { name = "langgraph", specifier = ">=0.2.50" },
     { name = "lxml", specifier = ">=5.2" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10" },
-    { name = "pandas", specifier = ">=2.2" },
+    { name = "pandas", marker = "extra == 'frontend'", specifier = ">=2.2" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.7" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pydantic-settings", specifier = ">=2.3" },
@@ -1487,13 +1489,13 @@ requires-dist = [
     { name = "respx", marker = "extra == 'dev'", specifier = ">=0.21" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0" },
-    { name = "streamlit", specifier = ">=1.37" },
+    { name = "streamlit", marker = "extra == 'frontend'", specifier = ">=1.37" },
     { name = "structlog", specifier = ">=24.1" },
     { name = "tenacity", specifier = ">=9.0" },
     { name = "types-redis", marker = "extra == 'dev'" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["frontend", "dev"]
 
 [[package]]
 name = "mypy"
