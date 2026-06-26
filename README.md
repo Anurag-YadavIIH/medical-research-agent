@@ -142,15 +142,71 @@ DATABASE_URL=postgresql+asyncpg://mra:mra@localhost:5432/mra \
 
 ## Screenshots
 
-_Placeholder — add screenshots of the Streamlit tabs (Summary, Comparison,
-Details, References, Raw JSON) here._
+These are real renders of the live Streamlit UI, driven against a genuine run
+of the LangGraph pipeline (real PubMed/CrossRef data for 3 actual randomized
+trials on corneal cross-linking, recorded as fixtures — see
+[`evaluations/README.md`](evaluations/README.md)). The LLM steps in this
+particular run used the evaluation harness's deterministic stub rather than a
+live model call, since no LLM key is provisioned in the environment that
+generated these — see [Verification status](#verification-status) below for
+exactly what that does and doesn't prove.
+
+| Evidence Summary | Study Comparison |
+|---|---|
+| ![Evidence Summary](docs/screenshots/01_evidence_summary.png) | ![Study Comparison](docs/screenshots/02_study_comparison.png) |
+
+| Study Details | References |
+|---|---|
+| ![Study Details](docs/screenshots/03_study_details.png) | ![References](docs/screenshots/04_references.png) |
+
+| Raw JSON |
+|---|
+| ![Raw JSON](docs/screenshots/05_raw_json.png) |
 
 ## Evaluation methodology
 
-The evaluation module (`evaluations/`) measures citation completeness, extraction
-accuracy against a labelled gold set, evidence-grade consistency, and hallucination
-(every cited PMID/DOI must exist in the retrieved set). Reports are emitted as JSON
-and Markdown. See [`evaluations/README.md`](evaluations/README.md).
+`evaluations/` (Phase 7) implements four metrics as pure functions over a
+run's `machine_json`, each against either real recorded fixtures or crafted
+unit-test inputs — never live calls by default:
+
+- **citation_completeness** — every PMID/DOI cited in the narrative or listed
+  as a reference must exist in the retrieved set. A fabricated citation is a
+  named hard failure; scoring 1.0 while citing one is structurally impossible.
+- **extraction_accuracy** — extracted fields vs. a labelled gold set: exact
+  match for `study_design`/`sample_size`, fuzzy (`difflib` ratio ≥ 0.6) for
+  free text.
+- **evidence_consistency** — the assigned evidence level must agree with the
+  real `deterministic_level()` mapping (reused, not re-implemented) from
+  `publication_types`. An unclassifiable publication type is surfaced as a
+  gap, not silently passed.
+- **hallucination_check** — every PMID/DOI anywhere in the output, plus every
+  sample-size/p-value-shaped numeric claim in the narrative, must trace back
+  to retrieved data.
+
+```bash
+make eval                      # fixtures only — no network, no LLM key needed
+make eval ARGS="--live"        # real NCBI/CrossRef + a real configured LLM key
+```
+
+Reports land in `evaluations/reports/<timestamp>.{json,md}`. Full detail,
+matching rules, and the fixture/gold-case layout: see
+[`evaluations/README.md`](evaluations/README.md).
+
+## Verification status
+
+What's actually been exercised, versus what's still pending a real LLM key:
+
+| Claim | Status | How it's verified |
+|---|---|---|
+| Pipeline wiring (7 agents → graph → API → DB) | ✅ Verified | 109 automated tests, real `build_research_graph()` run against fixtures (`tests/test_evaluation_runner.py`, `evaluations/`) |
+| Anti-fabrication: no citation survives outside the retrieved set | ✅ Verified | Enforced in code (`summary.py`'s `_strip_fabricated_citations`, `study_comparator.py`'s PMID filtering), tested directly with adversarial inputs |
+| Deterministic evidence-level mapping | ✅ Verified | Reused (not duplicated) across the agent and the evaluator; parametrized tests covering every level + edge cases (bare "Review", empty/unmapped types) |
+| Persistence transaction + rollback on failure | ✅ Verified | Direct repository-level test forces a commit failure and asserts rollback + no partial data survives |
+| 503 pre-flight on missing LLM key, 500 on pipeline/DB failure, 200-with-warnings on partial success | ✅ Verified | API-level tests against all four states |
+| Docker Compose stack (4 services, migration-on-start, healthchecks) | ✅ Verified | Brought up for real this session; `/health`, `/docs`, the 503 path, and frontend↔backend connectivity all checked against running containers |
+| Real PubMed/CrossRef HTTP integration | ✅ Verified | `services/pubmed.py` and `services/crossref.py` tested against respx-mocked *and* genuinely recorded real responses (`evaluations/fixtures/`) |
+| **End-to-end run with a real LLM** (actual query understanding, abstract extraction, narrative generation by a live model) | ⏳ **Pending a real key** | Everything upstream and downstream of the LLM calls is verified; the LLM call itself is stubbed in every automated run. Set `GROQ_API_KEY` or `OPENAI_API_KEY` and run `make eval ARGS="--live"` (or use the UI directly) to exercise this path for real. |
+| Live NCBI rate-limit behavior under sustained real traffic | ⏳ **Pending sustained live use** | The pacing logic is implemented and unit-tested in isolation; it hasn't been observed under real multi-request load. |
 
 ## Future improvements
 
@@ -161,8 +217,9 @@ and Markdown. See [`evaluations/README.md`](evaluations/README.md).
 
 ## Build phases
 
-1. ✅ Scaffolding · 2. PubMed + CrossRef · 3. LangGraph agents · 4. FastAPI ·
-5. Streamlit · 6. Docker · 7. Evaluation · 8. Testing + docs.
+✅ 1. Scaffolding · ✅ 2. PubMed + CrossRef · ✅ 3. LangGraph agents ·
+✅ 4. FastAPI · ✅ 5. Streamlit · ✅ 6. Docker · ✅ 7. Evaluation ·
+✅ 8. Testing + docs.
 
 ## License
 

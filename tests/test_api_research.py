@@ -175,6 +175,51 @@ def test_get_studies_404_for_unknown_query_id(client: TestClient) -> None:
     assert response.status_code == 404
 
 
+def test_research_falls_back_to_minimal_report_when_summary_node_crashed_outright(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # No "report" key at all -- simulates the summary node raising before it
+    # could build anything (caught by BaseAgent.__call__, not summary.py's own
+    # try/except), as opposed to a normal LLM error which still yields a report.
+    _patch_llm_configured(monkeypatch)
+    _patch_graph(
+        monkeypatch,
+        {
+            "errors": ["summary: unexpected crash"],
+            "studies": [_STUDY],
+        },
+    )
+
+    response = client.post("/research", json={"question": "What treats keratoconus?"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["warnings"] == ["summary: unexpected crash"]
+    assert "Report generation failed" in body["report_markdown"]
+    assert DISCLAIMER in body["report_markdown"]
+    assert body["machine_json"]["studies"][0]["pmid"] == "90000001"
+
+
+def test_research_persistence_failure_returns_500(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_llm_configured(monkeypatch)
+    _patch_graph(monkeypatch, {"errors": [], "studies": [_STUDY], "report": _REPORT})
+
+    async def _failing_save_research_run(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("database is down")
+
+    monkeypatch.setattr(
+        "medical_research_agent.database.repository.ResearchRepository.save_research_run",
+        _failing_save_research_run,
+    )
+
+    response = client.post("/research", json={"question": "What treats keratoconus?"})
+
+    assert response.status_code == 500
+    assert "Failed to persist research results" in response.json()["detail"]
+
+
 async def test_extracted_and_comparison_survive_the_persistence_round_trip(
     client: TestClient, monkeypatch: pytest.MonkeyPatch, db_session: AsyncSession
 ) -> None:
