@@ -45,6 +45,45 @@ async def test_skips_llm_call_for_studies_without_abstract(fake_chat_model) -> N
     assert fake_model is not None
 
 
+async def test_systematic_review_sample_size_uses_description_not_int(
+    fake_chat_model,
+) -> None:
+    # Real-world case that broke against a live model (PMID 42319968): a
+    # systematic review reports "36 studies", not a participant headcount.
+    # sample_size must stay None; the verbatim text goes in
+    # sample_size_description instead of forcing a non-numeric value into an
+    # int field (which is what previously caused the provider's structured-
+    # output validation to reject the tool call outright).
+    fake_result = ExtractedStudy(
+        pmid="placeholder",
+        study_design="Systematic review",
+        sample_size=None,
+        sample_size_description="36 studies",
+        main_findings="GLP-1RA and SGLT2i were both associated with lean body mass loss.",
+    )
+    fake_chat_model("medical_research_agent.agents.paper_reader", fake_result)
+
+    agent = PaperReaderAgent()
+    state = ResearchState(
+        question="Q",
+        studies=[
+            Study(
+                pmid="42319968",
+                title="Effects of GLP-1RA and SGLT2i on lean body mass",
+                abstract="A systematic review of 36 studies on body composition outcomes.",
+            )
+        ],
+    )
+
+    delta = await agent.run(state)
+
+    extracted = delta["extracted"]
+    assert len(extracted) == 1
+    assert extracted[0].sample_size is None
+    assert extracted[0].sample_size_description == "36 studies"
+    assert "errors" not in delta
+
+
 async def test_per_study_failure_does_not_drop_other_studies(fake_chat_model) -> None:
     fake_chat_model(
         "medical_research_agent.agents.paper_reader",

@@ -13,7 +13,7 @@ from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-Provider = Literal["openai", "groq"]
+Provider = Literal["openai", "groq", "gemini"]
 
 
 class Settings(BaseSettings):
@@ -31,8 +31,10 @@ class Settings(BaseSettings):
     default_llm_provider: Provider = "groq"
     openai_api_key: str | None = None
     groq_api_key: str | None = None
+    gemini_api_key: str | None = None
     openai_default_model: str = "gpt-4o-mini"
     groq_default_model: str = "llama-3.3-70b-versatile"
+    gemini_default_model: str = "gemini-2.0-flash"
     llm_temperature: float = 0.0
     llm_timeout_seconds: int = 60
     llm_max_retries: int = 3
@@ -63,11 +65,21 @@ class Settings(BaseSettings):
 
     def model_for(self, provider: Provider) -> str:
         """Return the configured default model name for a provider."""
-        return self.openai_default_model if provider == "openai" else self.groq_default_model
+        models: dict[Provider, str] = {
+            "openai": self.openai_default_model,
+            "groq": self.groq_default_model,
+            "gemini": self.gemini_default_model,
+        }
+        return models[provider]
 
     def api_key_for(self, provider: Provider) -> str | None:
         """Return the configured API key for a provider."""
-        return self.openai_api_key if provider == "openai" else self.groq_api_key
+        keys: dict[Provider, str | None] = {
+            "openai": self.openai_api_key,
+            "groq": self.groq_api_key,
+            "gemini": self.gemini_api_key,
+        }
+        return keys[provider]
 
 
 @lru_cache

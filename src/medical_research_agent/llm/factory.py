@@ -33,8 +33,8 @@ def get_chat_model(
     """Build a configured chat model for the requested provider.
 
     Args:
-        provider: ``"openai"`` or ``"groq"``. Defaults to the configured
-            ``DEFAULT_LLM_PROVIDER``.
+        provider: ``"openai"``, ``"groq"``, or ``"gemini"``. Defaults to the
+            configured ``DEFAULT_LLM_PROVIDER``.
         model: Override the provider's default model name.
         temperature: Override the configured sampling temperature.
 
@@ -49,9 +49,14 @@ def get_chat_model(
 
     api_key = settings.api_key_for(provider)
     if not api_key:
+        key_names: dict[Provider, str] = {
+            "openai": "OPENAI_API_KEY",
+            "groq": "GROQ_API_KEY",
+            "gemini": "GEMINI_API_KEY",
+        }
         raise LLMConfigurationError(
             f"No API key configured for provider '{provider}'. "
-            f"Set {'OPENAI_API_KEY' if provider == 'openai' else 'GROQ_API_KEY'} in your .env."
+            f"Set {key_names[provider]} in your .env."
         )
 
     common = {
@@ -59,16 +64,19 @@ def get_chat_model(
         "temperature": temperature,
         "timeout": settings.llm_timeout_seconds,
         "max_retries": settings.llm_max_retries,
-        "api_key": api_key,
     }
 
     if provider == "openai":
         from langchain_openai import ChatOpenAI
 
-        return ChatOpenAI(**common)
+        return ChatOpenAI(api_key=api_key, **common)
     if provider == "groq":
         from langchain_groq import ChatGroq
 
-        return ChatGroq(**common)
+        return ChatGroq(api_key=api_key, **common)
+    if provider == "gemini":
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
+        return ChatGoogleGenerativeAI(google_api_key=api_key, **common)
 
     raise ValueError(f"Unknown LLM provider: {provider!r}")

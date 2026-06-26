@@ -30,6 +30,7 @@ _FUZZY_FIELDS = (
     "comparator",
     "main_findings",
     "statistical_significance",
+    "sample_size_description",
 )
 _FUZZY_THRESHOLD = 0.6
 
@@ -100,8 +101,8 @@ def extraction_accuracy(
       - study_design: exact match, case/whitespace-normalized.
       - sample_size: exact integer match.
       - population, intervention, comparator, main_findings,
-        statistical_significance: fuzzy match via difflib.SequenceMatcher ratio
-        on normalized text, threshold >= 0.6.
+        statistical_significance, sample_size_description: fuzzy match via
+        difflib.SequenceMatcher ratio on normalized text, threshold >= 0.6.
     A field is only scored when gold provides a non-empty label for it — there's
     nothing to grade against an unlabelled field. If gold has a label and the
     model's value is empty or wrong, that's a scored miss, not a skip.

@@ -25,7 +25,12 @@ def _ensure_llm_configured() -> None:
     settings = get_settings()
     if settings.api_key_for(settings.default_llm_provider):
         return
-    key_name = "OPENAI_API_KEY" if settings.default_llm_provider == "openai" else "GROQ_API_KEY"
+    key_names: dict[str, str] = {
+        "openai": "OPENAI_API_KEY",
+        "groq": "GROQ_API_KEY",
+        "gemini": "GEMINI_API_KEY",
+    }
+    key_name = key_names[settings.default_llm_provider]
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         detail=(

@@ -2,8 +2,8 @@
   "case_id": "semaglutide_t2d",
   "question": "What recent randomized controlled trials evaluate GLP-1 receptor agonist therapy for type 2 diabetes?",
   "filters": { "max_papers": 5, "humans_only": true },
-  "min_studies": 2,
-  "retrieved_pmids": ["42259343", "42173109"],
+  "min_studies": 3,
+  "retrieved_pmids": ["42259343", "42173109", "42319968"],
 
   "gold_extractions": {
     "42259343": {
@@ -23,6 +23,16 @@
       "sample_size": 61,
       "main_findings": "6 weeks of GIP infusion did not improve glycaemic control as add-on to either placebo or semaglutide.",
       "statistical_significance": "p=0.13 (placebo+GIP vs placebo+placebo); p=1.00 (semaglutide+GIP vs semaglutide+placebo)"
+    },
+    "42319968": {
+      "study_design": "Systematic Review and Meta-Analysis",
+      "population": "Adults with obesity, type 1/type 2 diabetes, or polycystic ovary syndrome receiving GLP-1RA or SGLT2i",
+      "intervention": "GLP-1 receptor agonists (GLP-1RA) or SGLT2 inhibitors (SGLT2i)",
+      "comparator": "Placebo or active comparator",
+      "sample_size": null,
+      "sample_size_description": "36 studies (21 for GLP-1RA, 15 for SGLT2i)",
+      "main_findings": "Both GLP-1RA (MD -1.51 kg) and SGLT2i (MD -1.04 kg) were associated with loss of lean body mass, congruent with overall weight loss.",
+      "statistical_significance": "GLP-1RA MD: -1.51 kg (95% CI -2.00 to -1.01); SGLT2i MD: -1.04 kg (95% CI -1.45 to -0.64)"
     }
   },
 
@@ -50,11 +60,21 @@
       "sample_size": 61,
       "main_findings": "GIP infusion as add-on to placebo or semaglutide had an uncertain effect on glycaemic control given the small sample.",
       "statistical_significance": ""
+    },
+    "42319968": {
+      "study_design": "Systematic Review and Meta-Analysis",
+      "population": "Adults with obesity, type 1/type 2 diabetes, or polycystic ovary syndrome receiving GLP-1RA or SGLT2i",
+      "intervention": "GLP-1 receptor agonists (GLP-1RA) or SGLT2 inhibitors (SGLT2i)",
+      "comparator": "Placebo or active comparator",
+      "sample_size": null,
+      "sample_size_description": "36 studies (21 for GLP-1RA, 15 for SGLT2i)",
+      "main_findings": "Both GLP-1RA (MD -1.51 kg) and SGLT2i (MD -1.04 kg) were associated with loss of lean body mass, congruent with overall weight loss.",
+      "statistical_significance": "GLP-1RA MD: -1.51 kg (95% CI -2.00 to -1.01); SGLT2i MD: -1.04 kg (95% CI -1.45 to -0.64)"
     }
   },
 
   "stub_narrative": {
-    "evidence_summary": "Oral elecoglipron, a small-molecule GLP-1 receptor agonist, reduced HbA1c by up to 1.88% versus placebo over 26 weeks in 404 participants with type 2 diabetes [PMID: 42259343]. In a smaller trial of 61 participants, adding subcutaneous GIP infusion to semaglutide did not further improve glycaemic control [PMID: 42173109].",
+    "evidence_summary": "Oral elecoglipron, a small-molecule GLP-1 receptor agonist, reduced HbA1c by up to 1.88% versus placebo over 26 weeks in 404 participants with type 2 diabetes [PMID: 42259343]. In a smaller trial of 61 participants, adding subcutaneous GIP infusion to semaglutide did not further improve glycaemic control [PMID: 42173109]. A systematic review and meta-analysis of 36 studies found both GLP-1RA and SGLT2i therapy associated with loss of lean body mass alongside overall weight loss [PMID: 42319968].",
     "clinical_implications": "Oral small-molecule GLP-1 receptor agonists may offer an alternative to injectable therapies; GIP co-administration does not appear to add glycaemic benefit on top of semaglutide.",
     "limitations": "The GIP trial was underpowered (n=61) and single-centre; elecoglipron's phase 2b results require confirmation in phase 3 trials.",
     "future_directions": "Phase 3 trials of elecoglipron and larger GIP/GLP-1 co-agonism studies are needed."

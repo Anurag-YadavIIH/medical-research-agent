@@ -137,11 +137,17 @@ def test_research_seeded_errors_surface_as_warnings_with_200(
 
 
 def test_research_missing_llm_key_returns_503_with_actionable_message(
-    client: TestClient,
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Deliberately does not patch get_settings/build_research_graph: the repo's
-    # real .env ships with blank provider keys, so this exercises the actual
-    # pre-flight check without needing the graph to ever be constructed.
+    # Explicitly force blank keys rather than relying on the ambient .env being
+    # unconfigured — a developer's real .env (e.g. for a --live run) may have
+    # real keys set, and this test must still exercise the pre-flight check
+    # without ever reaching build_research_graph().
+    monkeypatch.setattr(
+        "medical_research_agent.api.routes.research.get_settings",
+        lambda: Settings(default_llm_provider="groq", groq_api_key=None, openai_api_key=None),
+    )
+
     response = client.post("/research", json={"question": "What treats keratoconus?"})
 
     assert response.status_code == 503
@@ -236,6 +242,7 @@ async def test_extracted_and_comparison_survive_the_persistence_round_trip(
             "pmid": "90000001",
             "objective": "",
             "sample_size": None,
+            "sample_size_description": "",
             "study_design": "",
             "population": "",
             "intervention": "",

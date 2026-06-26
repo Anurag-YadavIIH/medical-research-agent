@@ -15,7 +15,12 @@ _SYSTEM_PROMPT = (
     "You are extracting structured clinical information strictly from the abstract "
     "text provided. Use ONLY information explicitly stated in the abstract. If a "
     "field is not stated, leave it empty — never infer, estimate, or guess values "
-    "(including sample sizes or findings) that are not present in the text."
+    "(including sample sizes or findings) that are not present in the text.\n\n"
+    "For sample_size: put a number ONLY if the abstract reports a single participant/"
+    "patient headcount (e.g. 50 patients, 140 eyes). If it instead reports a count of "
+    "studies, trials, or any other non-participant quantity (e.g. '36 studies', "
+    "'12 RCTs'), or several different counts with no single headcount, leave "
+    "sample_size null and put the verbatim text in sample_size_description instead."
 )
 
 

@@ -37,7 +37,15 @@ class ExtractedStudy(BaseModel):
 
     pmid: str
     objective: str = ""
-    sample_size: int | None = None
+    sample_size: int | None = Field(
+        default=None,
+        description="Participant/patient headcount only — null if not a single number.",
+    )
+    sample_size_description: str = Field(
+        default="",
+        description="Verbatim sample-size text when it isn't a single headcount, "
+        "e.g. '36 studies', '12 RCTs, 4,231 patients'.",
+    )
     study_design: str = ""
     population: str = ""
     intervention: str = ""
