@@ -84,6 +84,9 @@ ignore_errors = true
 asyncio_mode = "auto"
 addopts = "-q --cov=medical_research_agent --cov-report=term-missing"
 testpaths = ["tests"]
+markers = [
+    "live: hits real external APIs (NCBI/CrossRef); skipped unless NCBI_EMAIL is set",
+]
 
 [tool.coverage.run]
 branch = true

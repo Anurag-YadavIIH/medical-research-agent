@@ -1,0 +1,71 @@
+<?xml version="1.0" ?>
+<!-- Synthetic NCBI PubmedArticleSet fixture for tests. Not real publications. -->
+<PubmedArticleSet>
+  <PubmedArticle>
+    <MedlineCitation Status="MEDLINE" Owner="NLM">
+      <PMID Version="1">90000001</PMID>
+      <Article PubModel="Print">
+        <Journal>
+          <JournalIssue CitedMedium="Print">
+            <Volume>1</Volume>
+            <Issue>1</Issue>
+            <PubDate>
+              <Year>2023</Year>
+              <Month>Jun</Month>
+            </PubDate>
+          </JournalIssue>
+          <Title>Journal of Synthetic Testing</Title>
+        </Journal>
+        <ArticleTitle>A Synthetic Study of Keratoconus Treatment Outcomes</ArticleTitle>
+        <Abstract>
+          <AbstractText Label="BACKGROUND" NlmCategory="BACKGROUND">This is a synthetic background section for testing.</AbstractText>
+          <AbstractText Label="METHODS" NlmCategory="METHODS">This is a synthetic methods section.</AbstractText>
+          <AbstractText Label="RESULTS" NlmCategory="RESULTS">This is a synthetic results section.</AbstractText>
+        </Abstract>
+        <AuthorList CompleteYN="Y">
+          <Author ValidYN="Y">
+            <LastName>Testauthor</LastName>
+            <ForeName>Jane</ForeName>
+            <Initials>J</Initials>
+          </Author>
+          <Author ValidYN="Y">
+            <CollectiveName>Synthetic Research Group</CollectiveName>
+          </Author>
+        </AuthorList>
+        <PublicationTypeList>
+          <PublicationType UI="D016428">Randomized Controlled Trial</PublicationType>
+          <PublicationType UI="D016454">Journal Article</PublicationType>
+        </PublicationTypeList>
+      </Article>
+    </MedlineCitation>
+  </PubmedArticle>
+  <PubmedArticle>
+    <MedlineCitation Status="MEDLINE" Owner="NLM">
+      <PMID Version="1">90000002</PMID>
+      <Article PubModel="Print">
+        <Journal>
+          <JournalIssue CitedMedium="Print">
+            <PubDate>
+              <MedlineDate>2021 Spring</MedlineDate>
+            </PubDate>
+          </JournalIssue>
+          <Title>Synthetic Ophthalmology Reports</Title>
+        </Journal>
+        <ArticleTitle>Synthetic Crosslinking Approaches: A Test Fixture</ArticleTitle>
+        <Abstract>
+          <AbstractText>Single-section synthetic abstract with no label, used purely for test coverage.</AbstractText>
+        </Abstract>
+        <AuthorList CompleteYN="Y">
+          <Author ValidYN="Y">
+            <LastName>Fixture</LastName>
+            <ForeName>Sam</ForeName>
+            <Initials>S</Initials>
+          </Author>
+        </AuthorList>
+        <PublicationTypeList>
+          <PublicationType UI="D016454">Journal Article</PublicationType>
+        </PublicationTypeList>
+      </Article>
+    </MedlineCitation>
+  </PubmedArticle>
+</PubmedArticleSet>
