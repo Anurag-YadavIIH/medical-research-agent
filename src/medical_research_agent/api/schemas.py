@@ -19,7 +19,9 @@ class ResearchRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    question: str = Field(min_length=3, examples=["What are recent treatments for keratoconus?"])
+    question: str = Field(
+        min_length=3, max_length=500, examples=["What are recent treatments for keratoconus?"]
+    )
     filters: SearchFilters = Field(default_factory=SearchFilters)
 
 

@@ -23,6 +23,7 @@ def configure_logging() -> None:
             structlog.processors.add_log_level,
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.processors.StackInfoRenderer(),
+            structlog.processors.format_exc_info,
             (
                 structlog.dev.ConsoleRenderer()
                 if settings.app_env == "development"

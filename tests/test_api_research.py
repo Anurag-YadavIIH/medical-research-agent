@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
+from structlog.testing import capture_logs
 
 from medical_research_agent.api.schemas import DISCLAIMER
 from medical_research_agent.config import Settings
@@ -136,6 +137,15 @@ def test_research_seeded_errors_surface_as_warnings_with_200(
     assert body["warnings"] == ["query_understanding: LLM call failed: boom"]
 
 
+def test_research_question_over_max_length_returns_422(client: TestClient) -> None:
+    response = client.post(
+        "/research",
+        json={"question": "x" * 501},
+    )
+
+    assert response.status_code == 422
+
+
 def test_research_extra_top_level_field_returns_422(client: TestClient) -> None:
     # max_papers at the top level (instead of nested under filters) must be a
     # hard 422, not a silent no-op, so callers learn immediately that their
@@ -175,16 +185,24 @@ def test_research_pipeline_crash_returns_500(
 
     class _CrashingGraph:
         async def ainvoke(self, state: object, config: object = None) -> dict[str, Any]:
-            raise RuntimeError("graph compile exploded")
+            raise RuntimeError("graph compile exploded: internal db dsn leaked here")
 
     monkeypatch.setattr(
         "medical_research_agent.api.routes.research.build_research_graph",
         lambda: _CrashingGraph(),
     )
 
-    response = client.post("/research", json={"question": "What treats keratoconus?"})
+    with capture_logs() as cap_logs:
+        response = client.post("/research", json={"question": "What treats keratoconus?"})
 
     assert response.status_code == 500
+    detail = response.json()["detail"]
+    assert detail == "Research pipeline failed unexpectedly. Please try again or contact support."
+    assert "internal db dsn leaked here" not in detail
+    assert "RuntimeError" not in detail
+
+    assert any("internal db dsn leaked here" in str(entry.get("error", "")) for entry in cap_logs)
+    assert any(entry.get("exc_type") == "RuntimeError" for entry in cap_logs)
 
 
 def test_get_studies_404_for_unknown_query_id(client: TestClient) -> None:
@@ -225,17 +243,24 @@ def test_research_persistence_failure_returns_500(
     _patch_graph(monkeypatch, {"errors": [], "studies": [_STUDY], "report": _REPORT})
 
     async def _failing_save_research_run(*args: object, **kwargs: object) -> None:
-        raise RuntimeError("database is down")
+        raise RuntimeError("database is down: postgresql://mra:secretpw@host/db")
 
     monkeypatch.setattr(
         "medical_research_agent.database.repository.ResearchRepository.save_research_run",
         _failing_save_research_run,
     )
 
-    response = client.post("/research", json={"question": "What treats keratoconus?"})
+    with capture_logs() as cap_logs:
+        response = client.post("/research", json={"question": "What treats keratoconus?"})
 
     assert response.status_code == 500
-    assert "Failed to persist research results" in response.json()["detail"]
+    detail = response.json()["detail"]
+    assert detail == "Failed to persist research results. Please try again."
+    assert "secretpw" not in detail
+    assert "RuntimeError" not in detail
+
+    assert any("secretpw" in str(entry.get("error", "")) for entry in cap_logs)
+    assert any(entry.get("exc_type") == "RuntimeError" for entry in cap_logs)
 
 
 async def test_extracted_and_comparison_survive_the_persistence_round_trip(
@@ -282,3 +307,18 @@ async def test_extracted_and_comparison_survive_the_persistence_round_trip(
     summary_record = await repo.get_summary(body["query_id"])
     assert summary_record is not None
     assert summary_record.machine_json == body["machine_json"]
+
+
+def test_research_rate_limit_returns_429_after_threshold(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_llm_configured(monkeypatch)
+    _patch_graph(monkeypatch, {"errors": [], "studies": [_STUDY], "report": _REPORT})
+
+    statuses = [
+        client.post("/research", json={"question": "What treats keratoconus?"}).status_code
+        for _ in range(11)
+    ]
+
+    assert statuses[:10] == [200] * 10
+    assert statuses[10] == 429

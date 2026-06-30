@@ -8,16 +8,19 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from medical_research_agent.api.rate_limit import enforce_rate_limit
 from medical_research_agent.api.schemas import ResearchRequest, ResearchResponse
 from medical_research_agent.config import get_settings
 from medical_research_agent.database.repository import ResearchRepository
 from medical_research_agent.database.session import get_session
 from medical_research_agent.graphs.research_graph import build_research_graph
+from medical_research_agent.logging_config import get_logger
 from medical_research_agent.models.report import EvidenceReport
 from medical_research_agent.models.state import ResearchState
 from medical_research_agent.models.study import Study
 
 router = APIRouter()
+logger = get_logger(__name__)
 
 
 def _ensure_llm_configured() -> None:
@@ -57,7 +60,11 @@ def _fallback_report(question: str, studies: list[Study]) -> EvidenceReport:
     return report
 
 
-@router.post("/research", response_model=ResearchResponse)
+@router.post(
+    "/research",
+    response_model=ResearchResponse,
+    dependencies=[Depends(enforce_rate_limit)],
+)
 async def research(
     request: ResearchRequest, session: AsyncSession = Depends(get_session)
 ) -> ResearchResponse:
@@ -77,9 +84,17 @@ async def research(
             initial_state, config={"configurable": {"thread_id": str(uuid.uuid4())}}
         )
     except Exception as exc:
+        # The raw exception (DB/LLM internals, stack-trace-shaped text) must never
+        # reach the client — log it fully server-side, return a generic message.
+        logger.error(
+            "research.pipeline_failed",
+            error=str(exc),
+            exc_type=type(exc).__name__,
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Research pipeline failed unexpectedly: {exc}",
+            detail="Research pipeline failed unexpectedly. Please try again or contact support.",
         ) from exc
 
     warnings = list(final_state.get("errors") or [])
@@ -91,9 +106,15 @@ async def research(
     try:
         query_record = await repo.save_research_run(request.question, request.filters, report)
     except Exception as exc:
+        logger.error(
+            "research.persistence_failed",
+            error=str(exc),
+            exc_type=type(exc).__name__,
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to persist research results: {exc}",
+            detail="Failed to persist research results. Please try again.",
         ) from exc
 
     return ResearchResponse(

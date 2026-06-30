@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 from medical_research_agent.api.main import create_app
+from medical_research_agent.api.rate_limit import reset_rate_limits
 from medical_research_agent.database.models import Base
 from medical_research_agent.database.session import get_session
 
@@ -38,6 +39,14 @@ async def db_session() -> AsyncIterator[AsyncSession]:
         yield session
 
     await engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter() -> None:
+    # The /research rate limiter keys off client IP in module-level state, so
+    # without a reset, request counts would leak across unrelated tests sharing
+    # TestClient's fixed host and trip false 429s.
+    reset_rate_limits()
 
 
 @pytest.fixture

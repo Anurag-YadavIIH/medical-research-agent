@@ -198,7 +198,7 @@ What's actually been exercised, versus what's still pending a real LLM key:
 
 | Claim | Status | How it's verified |
 |---|---|---|
-| Pipeline wiring (7 agents → graph → API → DB) | ✅ Verified | 117 automated tests, real `build_research_graph()` run against fixtures (`tests/test_evaluation_runner.py`, `evaluations/`) |
+| Pipeline wiring (7 agents → graph → API → DB) | ✅ Verified | 120 automated tests, real `build_research_graph()` run against fixtures (`tests/test_evaluation_runner.py`, `evaluations/`) |
 | Anti-fabrication: no citation survives outside the retrieved set | ✅ Verified | Enforced in code (`summary.py`'s `_strip_fabricated_citations`, `study_comparator.py`'s PMID filtering), tested directly with adversarial inputs |
 | Deterministic evidence-level mapping | ✅ Verified | Reused (not duplicated) across the agent and the evaluator; parametrized tests covering every level + edge cases (bare "Review", empty/unmapped types) |
 | Persistence transaction + rollback on failure | ✅ Verified | Direct repository-level test forces a commit failure and asserts rollback + no partial data survives |
@@ -207,6 +207,41 @@ What's actually been exercised, versus what's still pending a real LLM key:
 | Real PubMed/CrossRef HTTP integration | ✅ Verified | `services/pubmed.py` and `services/crossref.py` tested against respx-mocked *and* genuinely recorded real responses (`evaluations/fixtures/`) |
 | **End-to-end run with a real LLM** (query understanding, abstract extraction, evidence evaluation, study comparison, narrative summary) | ✅ Verified | Two live `POST /research` calls on Groq/llama-3.3-70b-versatile across 2 real clinical questions, 20 total real PubMed studies retrieved and extracted. 0 fabricated citations (every cited PMID traced to the retrieved set), 0 hallucinated numeric claims, `warnings: []` on both runs. `sample_size` schema fix confirmed on 3 separate review-type studies (correctly left `sample_size` null with verbatim text in `sample_size_description`) with zero Groq 400s. This proves Groq narrative generation works end-to-end — it does not exercise OpenAI (held in reserve, not run live) or Gemini (requires a billing-enabled project; free tier returns `limit: 0`, confirmed on two separate keys). |
 | Live NCBI rate-limit behavior under sustained real traffic | ⏳ **Pending sustained live use** | The pacing logic is implemented and unit-tested in isolation; it hasn't been observed under real multi-request load. |
+
+## Security notes
+
+A self-audit (secret scanning across full git history, dependency CVE scan,
+API/Docker hardening review) was run before publishing. Conscious, documented
+trade-offs rather than oversights:
+
+- **CORS is open by design** (`allow_origins=["*"]` in `api/main.py`). There is
+  no cookie/session/`Authorization`-header auth anywhere in the codebase, so
+  `allow_credentials` is left at its default `False` and a wildcard origin
+  carries no cross-origin credential risk. This is appropriate for a
+  public, read-mostly demo API — it is not a stand-in for a real auth layer.
+- **`POST /research` has a minimal in-process rate limiter**
+  (`api/rate_limit.py`): 10 requests/minute per client IP, returning 429 once
+  exceeded. It's a local, in-memory sliding window — state resets on process
+  restart and is **not** shared across replicas. It's enough to stop a single
+  client from trivially burning LLM/NCBI quota against this single-instance
+  deployment; it is **not** a substitute for real infra-level rate limiting
+  (an API gateway or a Redis-backed limiter) in a multi-replica production
+  deployment.
+- **Postgres/Redis host port mappings in `docker-compose.yml`**
+  (`5432:5432`, `6380:6379`) are a local-dev convenience only — neither
+  `backend` nor `migrate` need them; both talk to `postgres:5432`/`redis:6379`
+  over the internal Compose network. Drop these `ports:` entries in any real
+  deployment.
+- **Base-image CVEs**: Docker Scout flags a handful of HIGH/CRITICAL CVEs
+  (`perl`, `wheel`, `quinn-proto`) that come from the `python:3.11-slim`
+  (Debian) base image and its build toolchain, not from this project's own
+  dependencies (`pip-audit` against the resolved `uv.lock` set reports zero
+  known vulnerabilities). These are tracked for resolution on the next
+  `python:3.11-slim` base image bump rather than worked around here.
+- **No real secret has ever been committed** to this repo, on any branch, at
+  any point in its history (verified by a full `git log --all -p` history
+  scan plus a tree-walk for any `.env` file ever existing). `.env.example`
+  ships only blank placeholders for every provider key.
 
 ## Future improvements
 
