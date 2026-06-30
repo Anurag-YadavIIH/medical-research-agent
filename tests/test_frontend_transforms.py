@@ -7,6 +7,8 @@ from frontend.transforms import (
     comparison_narrative,
     evidence_level_label,
     evidence_summary_stats,
+    project_document_rows,
+    project_history_rows,
     reference_rows,
     study_detail_rows,
 )
@@ -165,6 +167,63 @@ def test_evidence_summary_stats_handles_empty_result() -> None:
     assert stats["level_counts"] == {}
     assert stats["strongest_level_label"] == "—"
     assert stats["year_range"] == "—"
+
+
+def test_project_history_rows_shapes_search_history() -> None:
+    history = [
+        {
+            "query_id": "q1",
+            "question": "What treats keratoconus?",
+            "created_at": "2026-06-30T12:00:00",
+            "studies": [{"pmid": "90000001", "title": "A study"}],
+        }
+    ]
+    rows = project_history_rows(history)
+
+    assert rows == [
+        {
+            "query_id": "q1",
+            "question": "What treats keratoconus?",
+            "created_at": "2026-06-30T12:00:00",
+            "study_count": 1,
+            "studies": [{"pmid": "90000001", "title": "A study"}],
+        }
+    ]
+
+
+def test_project_history_rows_handles_empty_history() -> None:
+    assert project_history_rows([]) == []
+
+
+def test_project_document_rows_builds_pmid_link_for_pubmed_source() -> None:
+    documents = [
+        {
+            "id": "doc-1",
+            "source": "pubmed",
+            "pmid": "90000001",
+            "title": "A study",
+            "created_at": "2026-06-30T12:00:00",
+        }
+    ]
+    rows = project_document_rows(documents)
+
+    assert rows[0]["pmid_url"] == "https://pubmed.ncbi.nlm.nih.gov/90000001/"
+
+
+def test_project_document_rows_no_pmid_link_for_uploaded_source() -> None:
+    documents = [
+        {
+            "id": "doc-2",
+            "source": "upload",
+            "pmid": None,
+            "title": "uploaded.pdf",
+            "created_at": "2026-06-30T12:00:00",
+        }
+    ]
+    rows = project_document_rows(documents)
+
+    assert rows[0]["pmid_url"] == ""
+    assert rows[0]["pmid"] is None
 
 
 def test_evidence_summary_stats_ignores_ungraded_when_picking_strongest() -> None:

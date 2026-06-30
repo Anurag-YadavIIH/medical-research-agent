@@ -8,13 +8,13 @@ ever reaches the report.
 
 from __future__ import annotations
 
-import re
 from typing import cast
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel
 
 from medical_research_agent.agents.base import BaseAgent
+from medical_research_agent.citation_utils import strip_fabricated_citations
 from medical_research_agent.llm.factory import get_chat_model
 from medical_research_agent.models.comparison import StudyComparison
 from medical_research_agent.models.report import EvidenceReport, ReferenceEntry
@@ -31,7 +31,6 @@ _SYSTEM_PROMPT = (
 )
 
 _THIN_EVIDENCE_THRESHOLD = 3
-_PMID_CITATION = re.compile(r"\[PMID:\s*([\w.-]+)\]")
 
 
 class _NarrativeSections(BaseModel):
@@ -73,19 +72,6 @@ def _sanitized_comparison(
             ],
         }
     )
-
-
-def _strip_fabricated_citations(text: str, valid_pmids: set[str]) -> tuple[str, list[str]]:
-    fabricated: list[str] = []
-
-    def _replace(match: re.Match[str]) -> str:
-        pmid = match.group(1)
-        if pmid in valid_pmids:
-            return match.group(0)
-        fabricated.append(pmid)
-        return ""
-
-    return _PMID_CITATION.sub(_replace, text), fabricated
 
 
 def _render_markdown(report: EvidenceReport) -> str:
@@ -169,7 +155,7 @@ class SummaryAgent(BaseAgent):
             "limitations",
             "future_directions",
         ):
-            text, fabricated = _strip_fabricated_citations(getattr(sections, field), valid_pmids)
+            text, fabricated = strip_fabricated_citations(getattr(sections, field), valid_pmids)
             if fabricated:
                 errors.append(
                     f"{self.name}: dropped fabricated PMID citation(s) {fabricated} from {field}"

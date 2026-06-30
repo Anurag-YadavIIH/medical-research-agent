@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import pytest
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_groq import ChatGroq
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from medical_research_agent.config import Settings
-from medical_research_agent.llm.factory import LLMConfigurationError, get_chat_model
+from medical_research_agent.llm.factory import (
+    LLMConfigurationError,
+    get_chat_model,
+    get_embeddings_model,
+)
 
 
 def _patch_settings(monkeypatch: pytest.MonkeyPatch, settings: Settings) -> None:
@@ -75,3 +79,42 @@ def test_get_chat_model_missing_openai_key_raises_with_actionable_message(
 
     with pytest.raises(LLMConfigurationError, match="OPENAI_API_KEY"):
         get_chat_model("openai")
+
+
+def test_get_embeddings_model_openai_constructs_openaiembeddings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_settings(monkeypatch, Settings(embedding_provider="openai", openai_api_key="fake-key"))
+
+    model = get_embeddings_model("openai")
+
+    assert isinstance(model, OpenAIEmbeddings)
+
+
+def test_get_embeddings_model_gemini_constructs_googlegenerativeaiembeddings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_settings(monkeypatch, Settings(embedding_provider="gemini", gemini_api_key="fake-key"))
+
+    model = get_embeddings_model("gemini")
+
+    assert isinstance(model, GoogleGenerativeAIEmbeddings)
+
+
+def test_get_embeddings_model_missing_key_raises_with_actionable_message(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_settings(monkeypatch, Settings(embedding_provider="openai", openai_api_key=None))
+
+    with pytest.raises(LLMConfigurationError, match="OPENAI_API_KEY"):
+        get_embeddings_model("openai")
+
+
+def test_get_embeddings_model_defaults_to_configured_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_settings(monkeypatch, Settings(embedding_provider="openai", openai_api_key="fake-key"))
+
+    model = get_embeddings_model()
+
+    assert isinstance(model, OpenAIEmbeddings)

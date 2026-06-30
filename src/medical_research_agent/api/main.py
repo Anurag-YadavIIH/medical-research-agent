@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from medical_research_agent import __version__
-from medical_research_agent.api.routes import health, research
+from medical_research_agent.api.routes import health, projects, research
 from medical_research_agent.api.schemas import DISCLAIMER
 from medical_research_agent.database.session import dispose_engine
 from medical_research_agent.logging_config import configure_logging
@@ -40,6 +40,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(health.router, tags=["health"])
     app.include_router(research.router, tags=["research"])
+    app.include_router(projects.router, tags=["projects"])
     return app
 
 

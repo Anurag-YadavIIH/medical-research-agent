@@ -80,14 +80,37 @@ class FakeStructuredRunnable:
         return result
 
 
+class _FakeAIMessage:
+    """Stands in for an ``AIMessage`` — just enough for ``.content`` access."""
+
+    def __init__(self, content: str) -> None:
+        self.content = content
+
+
 class FakeChatModel:
-    """Stands in for ``get_chat_model()`` — never makes a real LLM call."""
+    """Stands in for ``get_chat_model()`` — never makes a real LLM call.
+
+    Supports both call shapes used in this codebase: structured-output agents
+    (``.with_structured_output(Schema).ainvoke(...)``) and plain chat
+    (``.ainvoke(...)`` directly, e.g. the project chat service), sharing one
+    results queue either way.
+    """
 
     def __init__(self, results: list[Any]) -> None:
         self._results = results
+        self.call_count = 0
 
     def with_structured_output(self, schema: type[Any]) -> FakeStructuredRunnable:
         return FakeStructuredRunnable(self._results)
+
+    async def ainvoke(self, messages: list[BaseMessage]) -> _FakeAIMessage:
+        self.call_count += 1
+        if not self._results:
+            raise AssertionError("FakeChatModel called more times than expected")
+        result = self._results.pop(0)
+        if isinstance(result, Exception):
+            raise result
+        return _FakeAIMessage(result)
 
 
 @pytest.fixture
@@ -97,6 +120,40 @@ def fake_chat_model(monkeypatch: pytest.MonkeyPatch):
     def _patch(module: str, *results: Any) -> FakeChatModel:
         fake = FakeChatModel(list(results))
         monkeypatch.setattr(f"{module}.get_chat_model", lambda *a, **kw: fake)
+        return fake
+
+    return _patch
+
+
+class FakeEmbeddingsModel:
+    """Stands in for ``get_embeddings_model()`` — never makes a real API call."""
+
+    def __init__(
+        self, query_vector: list[float], document_vectors: list[list[float]] | None
+    ) -> None:
+        self._query_vector = query_vector
+        self._document_vectors = document_vectors
+
+    async def aembed_query(self, text: str) -> list[float]:
+        return self._query_vector
+
+    async def aembed_documents(self, texts: list[str]) -> list[list[float]]:
+        if self._document_vectors is not None:
+            return self._document_vectors
+        return [self._query_vector for _ in texts]
+
+
+@pytest.fixture
+def fake_embeddings_model(monkeypatch: pytest.MonkeyPatch):
+    """Return a factory that patches ``get_embeddings_model`` in the given module."""
+
+    def _patch(
+        module: str,
+        query_vector: list[float] | None = None,
+        document_vectors: list[list[float]] | None = None,
+    ) -> FakeEmbeddingsModel:
+        fake = FakeEmbeddingsModel(query_vector or [1.0, 0.0], document_vectors)
+        monkeypatch.setattr(f"{module}.get_embeddings_model", lambda *a, **kw: fake)
         return fake
 
     return _patch

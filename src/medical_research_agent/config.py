@@ -14,6 +14,7 @@ from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Provider = Literal["openai", "groq", "gemini"]
+EmbeddingProvider = Literal["openai", "gemini"]
 
 
 class Settings(BaseSettings):
@@ -38,6 +39,13 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.0
     llm_timeout_seconds: int = 60
     llm_max_retries: int = 3
+
+    # --- Embeddings (project chat / RAG retrieval) --------------------------
+    # Separate from default_llm_provider since Groq has no embeddings API —
+    # chat can stay on Groq while embeddings use OpenAI/Gemini.
+    embedding_provider: EmbeddingProvider = "openai"
+    openai_embedding_model: str = "text-embedding-3-small"
+    gemini_embedding_model: str = "models/text-embedding-004"
 
     # --- NCBI / PubMed -----------------------------------------------------
     ncbi_tool: str = "medical-research-agent"
@@ -80,6 +88,14 @@ class Settings(BaseSettings):
             "gemini": self.gemini_api_key,
         }
         return keys[provider]
+
+    def embedding_model_for(self, provider: EmbeddingProvider) -> str:
+        """Return the configured embedding model name for a provider."""
+        models: dict[EmbeddingProvider, str] = {
+            "openai": self.openai_embedding_model,
+            "gemini": self.gemini_embedding_model,
+        }
+        return models[provider]
 
 
 @lru_cache

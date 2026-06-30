@@ -134,3 +134,38 @@ def reference_rows(machine_json: dict[str, Any]) -> list[dict[str, Any]]:
             }
         )
     return rows
+
+
+def project_history_rows(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Rows for the Projects > Paper History tab's per-search expanders."""
+    rows: list[dict[str, Any]] = []
+    for item in history:
+        studies = item.get("studies") or []
+        rows.append(
+            {
+                "query_id": item.get("query_id", ""),
+                "question": item.get("question", ""),
+                "created_at": item.get("created_at", ""),
+                "study_count": len(studies),
+                "studies": studies,
+            }
+        )
+    return rows
+
+
+def project_document_rows(documents: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Rows for the Projects > Paper History tab's corpus listing, with PubMed links."""
+    rows: list[dict[str, Any]] = []
+    for doc in documents:
+        pmid = doc.get("pmid")
+        rows.append(
+            {
+                "id": doc.get("id", ""),
+                "source": doc.get("source", ""),
+                "title": doc.get("title", ""),
+                "pmid": pmid,
+                "pmid_url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/" if pmid else "",
+                "created_at": doc.get("created_at", ""),
+            }
+        )
+    return rows

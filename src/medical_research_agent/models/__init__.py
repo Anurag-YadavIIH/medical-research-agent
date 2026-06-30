@@ -2,6 +2,7 @@
 
 from medical_research_agent.models.comparison import StudyComparison
 from medical_research_agent.models.evidence import EvidenceAssessment, EvidenceLevel
+from medical_research_agent.models.project import ChatAnswer, ChatMessage, Project, ProjectDocument
 from medical_research_agent.models.query import QueryUnderstanding, SearchFilters
 from medical_research_agent.models.report import EvidenceReport, ReferenceEntry
 from medical_research_agent.models.state import ResearchState
@@ -18,4 +19,8 @@ __all__ = [
     "EvidenceReport",
     "ReferenceEntry",
     "ResearchState",
+    "Project",
+    "ProjectDocument",
+    "ChatMessage",
+    "ChatAnswer",
 ]

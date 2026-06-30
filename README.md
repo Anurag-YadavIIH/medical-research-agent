@@ -135,10 +135,47 @@ DATABASE_URL=postgresql+asyncpg://mra:mra@localhost:5432/mra \
 
 | Method | Path | Description |
 |---|---|---|
-| POST | `/research` | Run the synthesis pipeline for a question |
+| POST | `/research` | Run the synthesis pipeline for a question (normal, ungrouped search) |
 | GET | `/studies/{query_id}` | Retrieve persisted studies for a prior query |
+| POST | `/projects` | Create a project |
+| GET | `/projects` | List projects |
+| GET | `/projects/{id}` | Project detail: scoped search history + paper corpus |
+| DELETE | `/projects/{id}` | Delete a project (cascades to its history/corpus/chat) |
+| POST | `/projects/{id}/research` | Same pipeline as `/research`, scoped to a project |
+| POST | `/projects/{id}/documents` | Upload a paper PDF into a project's chat corpus |
+| POST | `/projects/{id}/chat` | Ask a question grounded only in that project's papers |
+| GET | `/projects/{id}/chat` | Retrieve a project's chat history |
 | GET | `/health` | Liveness + dependency checks |
 | GET | `/docs` | OpenAPI / Swagger UI |
+
+## Projects: scoped search, PDF upload, and grounded chat
+
+A Claude-Projects/NotebookLM-style workspace layered on top of the same
+pipeline, with **normal search left completely untouched**:
+
+- **Scoped search** — searching inside a project tags the results with that
+  project and accumulates them into its history, instead of the anonymous,
+  ungrouped history that `/research` always produces.
+- **PDF upload** — add a paper that isn't on PubMed (or a full-text PDF you
+  already have); it's chunked and embedded alongside PubMed results.
+- **Chat** — ask questions answered only from that project's accumulated
+  papers (PubMed abstracts/findings + uploaded PDF chunks), via real
+  embedding-based retrieval (cosine similarity over per-project chunks — see
+  `services/embeddings.py`), not the LLM's general knowledge. The same
+  anti-fabrication discipline as the narrative report applies: the model may
+  cite only `[DOC: <id>]` for ids actually present in its retrieved context;
+  anything else is stripped before the reply is returned
+  (`citation_utils.py`, shared with `agents/summary.py`).
+
+No vector database: per-project corpora are small (tens to low hundreds of
+chunks), so each chunk's embedding is stored as a plain JSON float array
+(reusing the existing dialect-portable `_JSONType`) and ranked with a
+pure-Python cosine similarity scan — real retrieval, without the
+infrastructure weight of a Postgres `vector` extension at this scale.
+
+Chat requires `EMBEDDING_PROVIDER`'s key to be configured (`OPENAI_API_KEY`
+by default) — see [Environment variables](#environment-variables) and the
+[Security notes](#security-notes) below for the PDF upload bound.
 
 ## Screenshots
 
@@ -199,8 +236,8 @@ What's actually been exercised, versus what's still pending a real LLM key:
 
 | Claim | Status | How it's verified |
 |---|---|---|
-| Pipeline wiring (7 agents → graph → API → DB) | ✅ Verified | 120 automated tests, real `build_research_graph()` run against fixtures (`tests/test_evaluation_runner.py`, `evaluations/`) |
-| Anti-fabrication: no citation survives outside the retrieved set | ✅ Verified | Enforced in code (`summary.py`'s `_strip_fabricated_citations`, `study_comparator.py`'s PMID filtering), tested directly with adversarial inputs |
+| Pipeline wiring (7 agents → graph → API → DB) | ✅ Verified | 208 automated tests, real `build_research_graph()` run against fixtures (`tests/test_evaluation_runner.py`, `evaluations/`) |
+| Anti-fabrication: no citation survives outside the retrieved set | ✅ Verified | Enforced in code (`citation_utils.py`, shared by `agents/summary.py` and the project chat service; `study_comparator.py`'s PMID filtering), tested directly with adversarial inputs |
 | Deterministic evidence-level mapping | ✅ Verified | Reused (not duplicated) across the agent and the evaluator; parametrized tests covering every level + edge cases (bare "Review", empty/unmapped types) |
 | Persistence transaction + rollback on failure | ✅ Verified | Direct repository-level test forces a commit failure and asserts rollback + no partial data survives |
 | 503 pre-flight on missing LLM key, 500 on pipeline/DB failure, 200-with-warnings on partial success | ✅ Verified | API-level tests against all four states |
@@ -243,13 +280,50 @@ trade-offs rather than oversights:
   any point in its history (verified by a full `git log --all -p` history
   scan plus a tree-walk for any `.env` file ever existing). `.env.example`
   ships only blank placeholders for every provider key.
+- **PDF uploads are bounded** (`api/routes/projects.py`): only
+  `application/pdf` is accepted, capped at 15 MB, 200 pages, and 200k
+  extracted characters (`services/pdf_extraction.py`) — all three **reject**
+  the upload outright rather than silently truncating it, so a corpus entry
+  is never silently incomplete. Filenames are capped at 255 chars, and each
+  project's chat corpus is capped at 200 documents total (`MAX_DOCUMENTS_PER_PROJECT`)
+  — a project-scoped search that would push past the cap skips the overflow
+  and surfaces a warning rather than failing the search itself. The
+  per-project `keywords` search field is similarly bounded (max 20 items,
+  100 chars each) against the same class of LLM-cost-amplification risk.
+  `/projects` endpoints sit behind the same per-IP rate limiter as
+  `/research`.
+- **Upload size checking is bounded-streaming, not zero-buffering.** The
+  upload route fast-rejects on a declared `Content-Length` header before
+  reading anything, then reads the body in 1 MB chunks and aborts as soon as
+  the running total exceeds 15 MB (`_read_upload_bounded` in
+  `api/routes/projects.py`) — memory use is capped at roughly
+  `15 MB + 1 MB` regardless of what a client sends, rather than the previous
+  behavior of buffering the entire body before checking its size. This is
+  **not** a true zero-buffering streaming guarantee (a client can still force
+  up to ~16 MB of buffering per request before rejection), and there is no
+  request-body-size cap at the ASGI/uvicorn layer itself — for a genuinely
+  multi-tenant or internet-facing deployment, terminate uploads at a reverse
+  proxy with its own body-size limit (e.g. nginx `client_max_body_size`)
+  ahead of this app, the same way the in-process rate limiter above is
+  documented as not a substitute for infra-level rate limiting.
+- **Project chat won't answer from nothing.** Before calling the chat model
+  at all, retrieved chunks are filtered to those scoring at least 0.3 cosine
+  similarity to the question (`MIN_RELEVANCE_SCORE` in `services/embeddings.py`)
+  — if nothing clears that bar, the project returns a fixed "nothing relevant
+  found" response without ever invoking the LLM. This is a structural
+  decline, not reliance on the model choosing to say "I don't know."
 
 ## Future improvements
 
-- Full-text retrieval (PMC/Unpaywall) beyond abstracts.
+- Automatic full-text retrieval (PMC/Unpaywall) beyond abstracts — Projects
+  partially addresses this today via manual PDF upload, but auto-fetching
+  full text for PubMed results themselves is still future work.
 - GRADE-based grading and risk-of-bias tooling (RoB 2 / ROBINS-I cues).
 - Parallel fan-out for per-study extraction with LangGraph map-reduce.
 - Human-in-the-loop review checkpoints and exportable PRISMA-style flow.
+- Proper ANN-indexed vector retrieval (e.g. pgvector) if per-project corpora
+  ever grow large enough that the current pure-Python cosine scan stops
+  being the right trade-off.
 
 ## Build phases
 

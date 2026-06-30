@@ -14,9 +14,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from medical_research_agent.config import Provider, get_settings
+from medical_research_agent.config import EmbeddingProvider, Provider, get_settings
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
+    from langchain_core.embeddings import Embeddings
     from langchain_core.language_models.chat_models import BaseChatModel
 
 
@@ -80,3 +81,41 @@ def get_chat_model(
         return ChatGoogleGenerativeAI(google_api_key=api_key, **common)
 
     raise ValueError(f"Unknown LLM provider: {provider!r}")
+
+
+def get_embeddings_model(provider: EmbeddingProvider | None = None) -> Embeddings:
+    """Build a configured embeddings model for the requested provider.
+
+    Args:
+        provider: ``"openai"`` or ``"gemini"`` (Groq has no embeddings API).
+            Defaults to the configured ``EMBEDDING_PROVIDER``.
+
+    Raises:
+        LLMConfigurationError: If the provider's API key is not configured.
+        ValueError: If the provider name is unknown.
+    """
+    settings = get_settings()
+    provider = provider or settings.embedding_provider
+    model = settings.embedding_model_for(provider)
+
+    api_key = settings.api_key_for(provider)
+    if not api_key:
+        key_names: dict[EmbeddingProvider, str] = {
+            "openai": "OPENAI_API_KEY",
+            "gemini": "GEMINI_API_KEY",
+        }
+        raise LLMConfigurationError(
+            f"No API key configured for embedding provider '{provider}'. "
+            f"Set {key_names[provider]} in your .env."
+        )
+
+    if provider == "openai":
+        from langchain_openai import OpenAIEmbeddings
+
+        return OpenAIEmbeddings(openai_api_key=api_key, model=model)
+    if provider == "gemini":
+        from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
+        return GoogleGenerativeAIEmbeddings(google_api_key=api_key, model=model)
+
+    raise ValueError(f"Unknown embedding provider: {provider!r}")

@@ -60,20 +60,27 @@ def _fallback_report(question: str, studies: list[Study]) -> EvidenceReport:
     return report
 
 
-@router.post(
-    "/research",
-    response_model=ResearchResponse,
-    dependencies=[Depends(enforce_rate_limit)],
-)
-async def research(
-    request: ResearchRequest, session: AsyncSession = Depends(get_session)
-) -> ResearchResponse:
-    """Run the evidence-synthesis pipeline for a clinical question and persist the result.
+async def run_research(
+    request: ResearchRequest,
+    session: AsyncSession,
+    *,
+    project_id: str | None = None,
+) -> tuple[ResearchResponse, EvidenceReport]:
+    """Run the evidence-synthesis pipeline and persist the result.
+
+    Shared by ``POST /research`` (project_id=None, normal/ungrouped search,
+    unchanged behavior) and ``POST /projects/{id}/research`` (project-scoped) —
+    one place doing pipeline-run + persist + error-leakage-safe logging,
+    rather than duplicating it per route.
 
     Agent-level failures (recorded in ``state.errors``) are surfaced as ``warnings``
     with a 200 — a thin or partial result is a normal research outcome. 5xx is
     reserved for genuine infrastructure failures (missing LLM key, DB down, an
     unexpected crash in the pipeline itself).
+
+    Returns the response plus the underlying ``EvidenceReport`` so callers that
+    need the retrieved studies (e.g. to embed them into a project's RAG corpus)
+    don't have to re-derive them from the response's ``machine_json``.
     """
     _ensure_llm_configured()
 
@@ -104,7 +111,9 @@ async def research(
 
     repo = ResearchRepository(session)
     try:
-        query_record = await repo.save_research_run(request.question, request.filters, report)
+        query_record = await repo.save_research_run(
+            request.question, request.filters, report, project_id=project_id
+        )
     except Exception as exc:
         logger.error(
             "research.persistence_failed",
@@ -117,13 +126,27 @@ async def research(
             detail="Failed to persist research results. Please try again.",
         ) from exc
 
-    return ResearchResponse(
+    response = ResearchResponse(
         query_id=query_record.id,
         question=request.question,
         report_markdown=report.markdown,
         machine_json=report.to_machine_json(),
         warnings=warnings,
     )
+    return response, report
+
+
+@router.post(
+    "/research",
+    response_model=ResearchResponse,
+    dependencies=[Depends(enforce_rate_limit)],
+)
+async def research(
+    request: ResearchRequest, session: AsyncSession = Depends(get_session)
+) -> ResearchResponse:
+    """Run the evidence-synthesis pipeline for a clinical question and persist the result."""
+    response, _report = await run_research(request, session)
+    return response
 
 
 @router.get("/studies/{query_id}", response_model=list[dict[str, Any]])

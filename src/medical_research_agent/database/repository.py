@@ -17,15 +17,25 @@ class ResearchRepository:
         self.session = session
 
     async def save_research_run(
-        self, question: str, filters: SearchFilters, report: EvidenceReport
+        self,
+        question: str,
+        filters: SearchFilters,
+        report: EvidenceReport,
+        project_id: str | None = None,
     ) -> QueryRecord:
         """Persist the query, its studies and the generated summary in one transaction.
 
         Rolls back the whole run if any part fails, so a partially-written query
-        never ends up in the database.
+        never ends up in the database. ``project_id`` is None for normal,
+        ungrouped search (unchanged default) and set when run from inside a
+        Project.
         """
         try:
-            query = QueryRecord(question=question, filters=filters.model_dump(mode="json"))
+            query = QueryRecord(
+                question=question,
+                filters=filters.model_dump(mode="json"),
+                project_id=project_id,
+            )
             self.session.add(query)
             await self.session.flush()  # assigns query.id for the foreign keys below
 
