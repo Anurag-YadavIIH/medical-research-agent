@@ -53,7 +53,6 @@ dev = [
     "black>=24.4",
     "mypy>=1.10",
     "pre-commit>=3.7",
-    "types-redis",
 ]
 
 [build-system]
@@ -92,6 +91,10 @@ follow_imports = "skip"
 # follow_imports_for_stubs is also set, so without this line numpy's stub is
 # still parsed and fails on its PEP 695 syntax under python_version = "3.11".
 follow_imports_for_stubs = true
+
+[[tool.mypy.overrides]]
+module = ["redis", "redis.*"]
+follow_imports = "skip"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

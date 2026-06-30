@@ -15,7 +15,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports: ["6379:6379"]
+    ports: ["6380:6379"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -42,7 +42,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://mra:mra@postgres:5432/mra
       REDIS_URL: redis://redis:6379/0
-    ports: ["8000:8000"]
+    ports: ["8001:8000"]
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }

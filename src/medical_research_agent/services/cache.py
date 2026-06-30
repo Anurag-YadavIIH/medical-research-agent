@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-import redis.asyncio as redis
+import redis.asyncio as redis  # type: ignore[import-untyped]
 
 from medical_research_agent.config import Settings, get_settings
 from medical_research_agent.logging_config import get_logger
@@ -45,4 +45,4 @@ class Cache:
             return False
 
     async def aclose(self) -> None:
-        await self._redis.aclose()  # type: ignore[attr-defined]
+        await self._redis.aclose()
