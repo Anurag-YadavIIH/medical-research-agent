@@ -70,4 +70,4 @@ def build_research_graph(
         graph.add_edge(prev.name, nxt.name)
     graph.add_edge(agents[-1].name, END)
 
-    return graph.compile(checkpointer=checkpointer)  # type: ignore[return-value]
+    return graph.compile(checkpointer=checkpointer)
