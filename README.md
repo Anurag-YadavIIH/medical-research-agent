@@ -198,14 +198,14 @@ What's actually been exercised, versus what's still pending a real LLM key:
 
 | Claim | Status | How it's verified |
 |---|---|---|
-| Pipeline wiring (7 agents → graph → API → DB) | ✅ Verified | 109 automated tests, real `build_research_graph()` run against fixtures (`tests/test_evaluation_runner.py`, `evaluations/`) |
+| Pipeline wiring (7 agents → graph → API → DB) | ✅ Verified | 117 automated tests, real `build_research_graph()` run against fixtures (`tests/test_evaluation_runner.py`, `evaluations/`) |
 | Anti-fabrication: no citation survives outside the retrieved set | ✅ Verified | Enforced in code (`summary.py`'s `_strip_fabricated_citations`, `study_comparator.py`'s PMID filtering), tested directly with adversarial inputs |
 | Deterministic evidence-level mapping | ✅ Verified | Reused (not duplicated) across the agent and the evaluator; parametrized tests covering every level + edge cases (bare "Review", empty/unmapped types) |
 | Persistence transaction + rollback on failure | ✅ Verified | Direct repository-level test forces a commit failure and asserts rollback + no partial data survives |
 | 503 pre-flight on missing LLM key, 500 on pipeline/DB failure, 200-with-warnings on partial success | ✅ Verified | API-level tests against all four states |
 | Docker Compose stack (4 services, migration-on-start, healthchecks) | ✅ Verified | Brought up for real this session; `/health`, `/docs`, the 503 path, and frontend↔backend connectivity all checked against running containers |
 | Real PubMed/CrossRef HTTP integration | ✅ Verified | `services/pubmed.py` and `services/crossref.py` tested against respx-mocked *and* genuinely recorded real responses (`evaluations/fixtures/`) |
-| **End-to-end run with a real LLM** (actual query understanding, abstract extraction, narrative generation by a live model) | ✅ Verified | Two live `POST /research` calls completed with `warnings: []` using Groq/llama-3.3-70b-versatile (`max_papers=5`, pass `filters.max_papers` not top-level). Both returned 0 fabricated citations, 0 hallucinated numeric claims. `sample_size` schema fix confirmed (reviews correctly null + `sample_size_description`; integer headcounts stay int). Note: Gemini requires billing — free tier returns `limit: 0`. |
+| **End-to-end run with a real LLM** (query understanding, abstract extraction, evidence evaluation, study comparison, narrative summary) | ✅ Verified | Two live `POST /research` calls on Groq/llama-3.3-70b-versatile across 2 real clinical questions, 20 total real PubMed studies retrieved and extracted. 0 fabricated citations (every cited PMID traced to the retrieved set), 0 hallucinated numeric claims, `warnings: []` on both runs. `sample_size` schema fix confirmed on 3 separate review-type studies (correctly left `sample_size` null with verbatim text in `sample_size_description`) with zero Groq 400s. This proves Groq narrative generation works end-to-end — it does not exercise OpenAI (held in reserve, not run live) or Gemini (requires a billing-enabled project; free tier returns `limit: 0`, confirmed on two separate keys). |
 | Live NCBI rate-limit behavior under sustained real traffic | ⏳ **Pending sustained live use** | The pacing logic is implemented and unit-tested in isolation; it hasn't been observed under real multi-request load. |
 
 ## Future improvements

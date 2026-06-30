@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from medical_research_agent.models.query import SearchFilters
 
@@ -16,6 +16,8 @@ DISCLAIMER = (
 
 class ResearchRequest(BaseModel):
     """Body for POST /research."""
+
+    model_config = ConfigDict(extra="forbid")
 
     question: str = Field(min_length=3, examples=["What are recent treatments for keratoconus?"])
     filters: SearchFilters = Field(default_factory=SearchFilters)

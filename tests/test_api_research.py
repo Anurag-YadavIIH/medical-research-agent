@@ -136,6 +136,18 @@ def test_research_seeded_errors_surface_as_warnings_with_200(
     assert body["warnings"] == ["query_understanding: LLM call failed: boom"]
 
 
+def test_research_extra_top_level_field_returns_422(client: TestClient) -> None:
+    # max_papers at the top level (instead of nested under filters) must be a
+    # hard 422, not a silent no-op, so callers learn immediately that their
+    # request is malformed.
+    response = client.post(
+        "/research",
+        json={"question": "What treats keratoconus?", "max_papers": 5},
+    )
+
+    assert response.status_code == 422
+
+
 def test_research_missing_llm_key_returns_503_with_actionable_message(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

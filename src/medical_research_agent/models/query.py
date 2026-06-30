@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SearchFilters(BaseModel):
     """User-controllable constraints applied to the literature search."""
+
+    model_config = ConfigDict(extra="forbid")
 
     year_min: int | None = Field(default=None, description="Earliest publication year.")
     year_max: int | None = Field(default=None, description="Latest publication year.")
