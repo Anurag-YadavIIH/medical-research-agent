@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+
+_Keyword = Annotated[str, StringConstraints(min_length=1, max_length=100)]
 
 
 class SearchFilters(BaseModel):
@@ -18,6 +22,12 @@ class SearchFilters(BaseModel):
     )
     humans_only: bool = Field(default=True, description="Restrict to human studies.")
     max_papers: int = Field(default=15, ge=1, le=100, description="Cap on retrieved papers.")
+    keywords: list[_Keyword] = Field(
+        default_factory=list,
+        max_length=20,
+        description="Additional free-text keywords the user wants the search biased toward "
+        "(each 1-100 chars, max 20 keywords) — bounded to prevent LLM prompt-cost amplification.",
+    )
 
 
 class QueryUnderstanding(BaseModel):

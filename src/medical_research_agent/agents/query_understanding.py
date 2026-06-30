@@ -19,6 +19,14 @@ _SYSTEM_PROMPT = (
 )
 
 
+def _build_question_prompt(question: str, keywords: list[str]) -> str:
+    """Fold user-supplied keywords into the question sent to the LLM, if any."""
+    if not keywords:
+        return question
+    keyword_str = ", ".join(keywords)
+    return f"{question}\n\nAdditional keywords to incorporate into the search: {keyword_str}"
+
+
 class QueryUnderstandingAgent(BaseAgent):
     """Interpret the clinician question into PICO terms and a PubMed search strategy."""
 
@@ -26,10 +34,11 @@ class QueryUnderstandingAgent(BaseAgent):
 
     async def run(self, state: ResearchState) -> dict[str, object]:
         model = get_chat_model().with_structured_output(QueryUnderstanding)
+        prompt = _build_question_prompt(state.question, state.filters.keywords)
         result = cast(
             QueryUnderstanding,
             await model.ainvoke(
-                [SystemMessage(content=_SYSTEM_PROMPT), HumanMessage(content=state.question)]
+                [SystemMessage(content=_SYSTEM_PROMPT), HumanMessage(content=prompt)]
             ),
         )
         return {"query_understanding": result}

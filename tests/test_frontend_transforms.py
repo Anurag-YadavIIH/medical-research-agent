@@ -6,6 +6,7 @@ from frontend.transforms import (
     comparison_matrix_rows,
     comparison_narrative,
     evidence_level_label,
+    evidence_summary_stats,
     reference_rows,
     study_detail_rows,
 )
@@ -108,6 +109,8 @@ def test_study_detail_rows_joins_study_extracted_and_assessment_by_pmid() -> Non
     assert row["main_findings"] == "Synthetic improvement observed."
     assert row["evidence_level"] == "Level II — Randomized controlled trial"
     assert row["strength"] == "moderate"
+    assert row["pmid_url"] == "https://pubmed.ncbi.nlm.nih.gov/90000001/"
+    assert row["doi_url"] == "https://doi.org/10.9999/test.synthetic.0001"
 
 
 def test_study_detail_rows_handles_study_with_no_extraction_or_assessment() -> None:
@@ -121,6 +124,8 @@ def test_study_detail_rows_handles_study_with_no_extraction_or_assessment() -> N
     assert rows[0]["pmid"] == "90000002"
     assert rows[0]["objective"] == ""
     assert rows[0]["evidence_level"] == "Ungraded"
+    assert rows[0]["pmid_url"] == "https://pubmed.ncbi.nlm.nih.gov/90000002/"
+    assert rows[0]["doi_url"] == ""
 
 
 def test_reference_rows_builds_pmid_and_doi_links() -> None:
@@ -142,3 +147,34 @@ def test_reference_rows_falls_back_to_url_when_no_doi() -> None:
 
 def test_reference_rows_handles_missing_references() -> None:
     assert reference_rows({}) == []
+
+
+def test_evidence_summary_stats_aggregates_machine_json() -> None:
+    stats = evidence_summary_stats(_MACHINE_JSON)
+    assert stats["total_studies"] == 1
+    assert stats["total_references"] == 1
+    assert stats["level_counts"] == {"Level II — Randomized controlled trial": 1}
+    assert stats["strongest_level_label"] == "Level II — Randomized controlled trial"
+    assert stats["year_range"] == "2023–2023"
+
+
+def test_evidence_summary_stats_handles_empty_result() -> None:
+    stats = evidence_summary_stats({})
+    assert stats["total_studies"] == 0
+    assert stats["total_references"] == 0
+    assert stats["level_counts"] == {}
+    assert stats["strongest_level_label"] == "—"
+    assert stats["year_range"] == "—"
+
+
+def test_evidence_summary_stats_ignores_ungraded_when_picking_strongest() -> None:
+    machine_json = {
+        "studies": [{"pmid": "1"}, {"pmid": "2"}],
+        "assessments": [
+            {"pmid": "1", "evidence_level": 99},
+            {"pmid": "2", "evidence_level": 3},
+        ],
+    }
+    stats = evidence_summary_stats(machine_json)
+    assert stats["strongest_level_label"] == "Level III — Cohort study"
+    assert stats["level_counts"] == {"Ungraded": 1, "Level III — Cohort study": 1}

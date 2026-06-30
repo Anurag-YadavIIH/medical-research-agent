@@ -9,7 +9,6 @@ directly rather than via config.Settings.
 
 from __future__ import annotations
 
-import json
 import os
 
 import pandas as pd
@@ -18,6 +17,7 @@ import streamlit as st
 from transforms import (
     comparison_matrix_rows,
     comparison_narrative,
+    evidence_summary_stats,
     reference_rows,
     study_detail_rows,
 )
@@ -28,31 +28,106 @@ DISCLAIMER = (
     "on professional judgment and full-text evidence review."
 )
 REQUEST_TIMEOUT_SECONDS = 300
+MAX_PAPERS_BOUNDS = (1, 50)
 
 st.set_page_config(page_title="Medical Research Agent", page_icon="🔬", layout="wide")
+
+st.markdown(
+    """
+    <style>
+    .block-container { padding-top: 2rem; }
+    [data-testid="stMetricValue"] { font-size: 1.5rem; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 st.title("🔬 Medical Research Agent")
-st.warning(DISCLAIMER)
+st.caption("Multi-agent, fully-cited biomedical evidence synthesis — built on PubMed literature.")
+st.warning(f"⚠️ {DISCLAIMER}")
 
 with st.sidebar:
-    st.header("Search filters")
+    st.header("🔎 Search filters")
     year_min = st.number_input("Year from", min_value=1900, max_value=2100, value=2018)
     year_max = st.number_input("Year to", min_value=1900, max_value=2100, value=2025)
     article_type = st.multiselect(
         "Article types",
         ["Randomized Controlled Trial", "Meta-Analysis", "Systematic Review", "Review"],
     )
-    max_papers = st.slider("Max papers", 1, 50, 15)
 
-question = st.text_input(
-    "Clinical question", placeholder="What are recent treatments for keratoconus?"
-)
-run = st.button("Synthesize evidence", type="primary")
+    st.markdown("**Max papers**")
+    if "max_papers_slider" not in st.session_state:
+        st.session_state["max_papers_slider"] = 15
+    if "max_papers_input" not in st.session_state:
+        st.session_state["max_papers_input"] = 15
 
-tabs = st.tabs(["Evidence Summary", "Study Comparison", "Study Details", "References", "Raw JSON"])
+    def _sync_from_slider() -> None:
+        st.session_state["max_papers_input"] = st.session_state["max_papers_slider"]
+
+    def _sync_from_input() -> None:
+        st.session_state["max_papers_slider"] = st.session_state["max_papers_input"]
+
+    slider_col, number_col = st.columns([3, 1])
+    with slider_col:
+        st.slider(
+            "Max papers",
+            *MAX_PAPERS_BOUNDS,
+            key="max_papers_slider",
+            on_change=_sync_from_slider,
+            label_visibility="collapsed",
+        )
+    with number_col:
+        st.number_input(
+            "Max papers (exact)",
+            *MAX_PAPERS_BOUNDS,
+            key="max_papers_input",
+            on_change=_sync_from_input,
+            label_visibility="collapsed",
+        )
+    max_papers = st.session_state["max_papers_slider"]
+
+question_col, keywords_col = st.columns([3, 2])
+with question_col:
+    question = st.text_input(
+        "Clinical question", placeholder="What are recent treatments for keratoconus?"
+    )
+with keywords_col:
+    keywords_raw = st.text_input(
+        "Additional keywords (optional)",
+        placeholder="e.g. crosslinking, pediatric, RCT",
+        help="Comma-separated terms the search should be biased toward, on top of the question.",
+    )
+keywords = [k.strip() for k in keywords_raw.split(",") if k.strip()]
+
+run = st.button("Synthesize evidence", type="primary", use_container_width=False)
+
+tabs = st.tabs(["📋 Evidence Summary", "⚖️ Study Comparison", "📑 Study Details", "🔗 References"])
 
 
-def _render_evidence_summary_tab(report_markdown: str) -> None:
+def _render_evidence_summary_tab(report_markdown: str, machine_json: dict) -> None:
     with tabs[0]:
+        stats = evidence_summary_stats(machine_json)
+        if stats["total_studies"]:
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Studies synthesized", stats["total_studies"])
+            c2.metric("Strongest evidence", stats["strongest_level_label"].split("—")[0].strip())
+            c3.metric("References", stats["total_references"])
+            c4.metric("Year range", stats["year_range"])
+
+            if stats["level_counts"]:
+                with st.expander("Evidence level breakdown"):
+                    st.dataframe(
+                        pd.DataFrame(
+                            {
+                                "Evidence level": list(stats["level_counts"].keys()),
+                                "Studies": list(stats["level_counts"].values()),
+                            }
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+            st.divider()
+
         if report_markdown:
             st.markdown(report_markdown)
         else:
@@ -64,9 +139,9 @@ def _render_study_comparison_tab(machine_json: dict) -> None:
         narrative = comparison_narrative(machine_json)
         if any(narrative.values()):
             for label, key in (
-                ("Agreements", "agreements"),
-                ("Disagreements", "disagreements"),
-                ("Emerging trends", "trends"),
+                ("✅ Agreements", "agreements"),
+                ("⚠️ Disagreements", "disagreements"),
+                ("📈 Emerging trends", "trends"),
             ):
                 if narrative[key]:
                     st.markdown(f"**{label}**")
@@ -86,6 +161,10 @@ def _render_study_details_tab(machine_json: dict) -> None:
         if not rows:
             st.info("No studies were retrieved for this query.")
             return
+        st.caption(
+            "Full text isn't fetched here (publisher access restrictions) — each study "
+            "links out to its source so you can read the original."
+        )
         for row in rows:
             title = row["title"] or f"PMID {row['pmid']}"
             with st.expander(f"{title}  ·  PMID {row['pmid']}"):
@@ -94,6 +173,13 @@ def _render_study_details_tab(machine_json: dict) -> None:
                     f"**Year:** {row['publication_year'] or '—'}  ·  "
                     f"**Evidence level:** {row['evidence_level']}"
                 )
+                link_bits = []
+                if row["pmid_url"]:
+                    link_bits.append(f"[📖 Read on PubMed]({row['pmid_url']})")
+                if row["doi_url"]:
+                    link_bits.append(f"[🔗 Publisher / DOI page]({row['doi_url']})")
+                if link_bits:
+                    st.markdown("  ·  ".join(link_bits))
                 if row["abstract"]:
                     st.markdown(f"**Abstract:** {row['abstract']}")
                 for label, key in (
@@ -134,17 +220,6 @@ def _render_references_tab(machine_json: dict) -> None:
             st.markdown(f"{i}. {row['vancouver']}" + (f"  ·  {link_str}" if link_str else ""))
 
 
-def _render_raw_json_tab(machine_json: dict) -> None:
-    with tabs[4]:
-        st.json(machine_json)
-        st.download_button(
-            "Download machine_json",
-            data=json.dumps(machine_json, indent=2),
-            file_name="research_result.json",
-            mime="application/json",
-        )
-
-
 def _render_result(data: dict) -> None:
     warnings = data.get("warnings") or []
     if warnings:
@@ -157,11 +232,10 @@ def _render_result(data: dict) -> None:
     if not machine_json.get("studies"):
         st.info("No studies were retrieved for this question. Try broadening your filters.")
 
-    _render_evidence_summary_tab(data.get("report_markdown", ""))
+    _render_evidence_summary_tab(data.get("report_markdown", ""), machine_json)
     _render_study_comparison_tab(machine_json)
     _render_study_details_tab(machine_json)
     _render_references_tab(machine_json)
-    _render_raw_json_tab(machine_json)
 
 
 if run and question:
@@ -176,6 +250,7 @@ if run and question:
                         "year_max": year_max,
                         "article_types": article_type,
                         "max_papers": max_papers,
+                        "keywords": keywords,
                     },
                 },
                 timeout=REQUEST_TIMEOUT_SECONDS,

@@ -142,6 +142,11 @@ DATABASE_URL=postgresql+asyncpg://mra:mra@localhost:5432/mra \
 
 ## Screenshots
 
+> **Note:** the screenshots below predate a frontend UX refresh (light theme,
+> reading links per study, an at-a-glance evidence summary, the Raw JSON tab
+> removed, free-text search keywords). They still reflect real pipeline output
+> shape; new screenshots are pending a retake against the refreshed UI.
+
 These are real renders of the live Streamlit UI, driven against a genuine run
 of the LangGraph pipeline (real PubMed/CrossRef data for 3 actual randomized
 trials on corneal cross-linking, recorded as fixtures — see
@@ -158,10 +163,6 @@ exactly what that does and doesn't prove.
 | Study Details | References |
 |---|---|
 | ![Study Details](docs/screenshots/03_study_details.png) | ![References](docs/screenshots/04_references.png) |
-
-| Raw JSON |
-|---|
-| ![Raw JSON](docs/screenshots/05_raw_json.png) |
 
 ## Evaluation methodology
 

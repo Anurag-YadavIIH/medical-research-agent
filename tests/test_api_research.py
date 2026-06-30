@@ -146,6 +146,30 @@ def test_research_question_over_max_length_returns_422(client: TestClient) -> No
     assert response.status_code == 422
 
 
+def test_research_too_many_keywords_returns_422(client: TestClient) -> None:
+    response = client.post(
+        "/research",
+        json={
+            "question": "What treats keratoconus?",
+            "filters": {"keywords": [f"kw{i}" for i in range(21)]},
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_research_overlong_keyword_returns_422(client: TestClient) -> None:
+    response = client.post(
+        "/research",
+        json={
+            "question": "What treats keratoconus?",
+            "filters": {"keywords": ["x" * 101]},
+        },
+    )
+
+    assert response.status_code == 422
+
+
 def test_research_extra_top_level_field_returns_422(client: TestClient) -> None:
     # max_papers at the top level (instead of nested under filters) must be a
     # hard 422, not a silent no-op, so callers learn immediately that their

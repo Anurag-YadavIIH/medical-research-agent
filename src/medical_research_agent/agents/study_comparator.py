@@ -8,7 +8,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from medical_research_agent.agents.base import BaseAgent
 from medical_research_agent.llm.factory import get_chat_model
-from medical_research_agent.models.comparison import StudyComparison
+from medical_research_agent.models.comparison import StudyComparison, StudyComparisonNarrative
 from medical_research_agent.models.state import ResearchState
 
 _SYSTEM_PROMPT = (
@@ -53,10 +53,10 @@ class StudyComparatorAgent(BaseAgent):
 
         comparison_matrix = _build_comparison_matrix(state)
         context = self._build_context(state)
-        model = get_chat_model().with_structured_output(StudyComparison)
+        model = get_chat_model().with_structured_output(StudyComparisonNarrative)
         try:
-            comparison = cast(
-                StudyComparison,
+            narrative = cast(
+                StudyComparisonNarrative,
                 await model.ainvoke(
                     [SystemMessage(content=_SYSTEM_PROMPT), HumanMessage(content=context)]
                 ),
@@ -68,13 +68,18 @@ class StudyComparatorAgent(BaseAgent):
             }
 
         valid_pmids = {study.pmid for study in state.studies}
-        comparison.strongest_evidence_pmids = [
-            pmid for pmid in comparison.strongest_evidence_pmids if pmid in valid_pmids
-        ]
-        comparison.conflicting_evidence_pmids = [
-            pmid for pmid in comparison.conflicting_evidence_pmids if pmid in valid_pmids
-        ]
-        comparison.comparison_matrix = comparison_matrix
+        comparison = StudyComparison(
+            agreements=narrative.agreements,
+            disagreements=narrative.disagreements,
+            trends=narrative.trends,
+            strongest_evidence_pmids=[
+                pmid for pmid in narrative.strongest_evidence_pmids if pmid in valid_pmids
+            ],
+            conflicting_evidence_pmids=[
+                pmid for pmid in narrative.conflicting_evidence_pmids if pmid in valid_pmids
+            ],
+            comparison_matrix=comparison_matrix,
+        )
         return {"comparison": comparison}
 
     def _build_context(self, state: ResearchState) -> str:

@@ -56,6 +56,7 @@ def study_detail_rows(machine_json: dict[str, Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for study in machine_json.get("studies") or []:
         pmid = study.get("pmid", "")
+        doi = study.get("doi")
         extracted = extracted_by_pmid.get(pmid, {})
         assessment = assessment_by_pmid.get(pmid, {})
         rows.append(
@@ -66,6 +67,8 @@ def study_detail_rows(machine_json: dict[str, Any]) -> list[dict[str, Any]]:
                 "journal": study.get("journal", ""),
                 "publication_year": study.get("publication_year"),
                 "abstract": study.get("abstract", ""),
+                "pmid_url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/" if pmid else "",
+                "doi_url": f"https://doi.org/{doi}" if doi else (study.get("url") or ""),
                 "objective": extracted.get("objective", ""),
                 "population": extracted.get("population", ""),
                 "intervention": extracted.get("intervention", ""),
@@ -81,6 +84,38 @@ def study_detail_rows(machine_json: dict[str, Any]) -> list[dict[str, Any]]:
             }
         )
     return rows
+
+
+def evidence_summary_stats(machine_json: dict[str, Any]) -> dict[str, Any]:
+    """At-a-glance counts for the Evidence Summary tab, derived purely from
+    already-returned ``machine_json`` — no new claims, just aggregation.
+    """
+    studies = machine_json.get("studies") or []
+    assessments = machine_json.get("assessments") or []
+    references = machine_json.get("references") or []
+
+    level_counts: dict[str, int] = {}
+    levels_present: list[int] = []
+    for assessment in assessments:
+        level = assessment.get("evidence_level")
+        level_counts[evidence_level_label(level)] = (
+            level_counts.get(evidence_level_label(level), 0) + 1
+        )
+        if level is not None and level != 99:
+            levels_present.append(level)
+
+    years = sorted({s.get("publication_year") for s in studies if s.get("publication_year")})
+
+    return {
+        "total_studies": len(studies),
+        "total_references": len(references),
+        "level_counts": level_counts,
+        # Evidence levels are ranked 1 (strongest) through 5 (weakest); 99 = ungraded.
+        "strongest_level_label": (
+            evidence_level_label(min(levels_present)) if levels_present else "—"
+        ),
+        "year_range": f"{years[0]}–{years[-1]}" if years else "—",
+    }
 
 
 def reference_rows(machine_json: dict[str, Any]) -> list[dict[str, Any]]:

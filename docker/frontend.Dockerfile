@@ -2,6 +2,7 @@ FROM python:3.11-slim
 ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 RUN pip install --no-cache-dir streamlit requests pandas
+COPY .streamlit ./.streamlit
 COPY frontend ./frontend
 RUN useradd --create-home --uid 1000 appuser && chown -R appuser:appuser /app
 USER appuser
