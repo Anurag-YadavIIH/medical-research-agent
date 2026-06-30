@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-import redis.asyncio as redis  # type: ignore[import-untyped]
+import redis.asyncio as redis
 
 from medical_research_agent.config import Settings, get_settings
 from medical_research_agent.logging_config import get_logger

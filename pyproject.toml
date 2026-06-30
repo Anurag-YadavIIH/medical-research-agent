@@ -92,10 +92,6 @@ follow_imports = "skip"
 # still parsed and fails on its PEP 695 syntax under python_version = "3.11".
 follow_imports_for_stubs = true
 
-[[tool.mypy.overrides]]
-module = ["redis", "redis.*"]
-follow_imports = "skip"
-
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 addopts = "-q --cov=medical_research_agent --cov-report=term-missing"
